@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+python-socketio
+pynput
+mss
+Pillow

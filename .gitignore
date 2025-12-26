@@ -1,0 +1,27 @@
+# Android
+/android-client/app/build
+/android-client/build
+/android-client/.gradle
+/android-client/app/*.jks
+/android-client/local.properties
+/android-client/sdk
+
+# Python
+/linux-server/venv
+/windows-server/venv
+/__pycache__/
+*.pyc
+
+# Windows
+/windows-server/build
+/windows-server/dist
+/windows-server/*.spec
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Other
+*~
