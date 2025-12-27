@@ -4,3 +4,5 @@ python-socketio
 pynput
 mss
 Pillow
+rtsp-server
+PyGObject
