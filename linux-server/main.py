@@ -2,26 +2,30 @@ import asyncio
 import socket
 from threading import Thread
 import subprocess
+from urllib.parse import parse_qs
 
 import uvicorn
+import uinput
 from fastapi import FastAPI
-from pynput.mouse import Button, Controller as MouseController
 from pynput.keyboard import Key, Controller as KeyboardController
 from socketio import ASGIApp, AsyncServer
 
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GObject
+from gi.repository import Gst
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
 
+from jeepney import DBusAddress, new_method_call
+from jeepney.io.asyncio import open_dbus_router
+from jeepney.low_level import Variant
+
 # Initialize GStreamer
 Gst.init(None)
-GObject.threads_init()
 
-# Global variables for screen resolution
-SCREEN_WIDTH = 1920 # Default or fallback
-SCREEN_HEIGHT = 1080 # Default or fallback
+# Global variables
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
 
 def get_screen_resolution_wayland():
     """
@@ -31,10 +35,8 @@ def get_screen_resolution_wayland():
     try:
         display = Gdk.Display.get_default()
         if display:
-            # Get the primary monitor
             monitor = display.get_primary_monitor()
             if not monitor:
-                # Fallback to the first monitor if no primary is found
                 monitor = display.get_monitor(0)
             
             if monitor:
@@ -48,24 +50,70 @@ def get_screen_resolution_wayland():
         print(f"An error occurred while getting screen resolution: {e}")
     return None
 
-def start_tablet_stream(client_ip):
-    # Pipeline for AMD Radeon 780M (VA-API)
-    # - pipewiresrc: Captures Wayland without the screenshot 'flash'
-    # - vaapih264enc: Uses your AMD GPU
+async def get_pipewire_node_id():
+    """
+    Uses jeepney to request a screen cast session and returns the PipeWire node ID.
+    """
+    try:
+        portal_addr = DBusAddress(
+            '/org/freedesktop/portal/desktop',
+            bus_name='org.freedesktop.portal.Desktop',
+            interface='org.freedesktop.portal.ScreenCast'
+        )
+
+        async with open_dbus_router(bus='SESSION') as router:
+            # Create a session
+            create_session_msg = new_method_call(
+                portal_addr, 'CreateSession', 'a{sv}', ({},)
+            )
+            reply = await router.send_and_get_reply(create_session_msg)
+            session_handle = reply.body[0]
+            session_addr = portal_addr.replace(path=session_handle)
+
+            # Select sources
+            select_sources_msg = new_method_call(
+                session_addr, 'SelectSources', 'a{sv}',
+                ({'multiple': Variant('b', False), 'types': Variant('u', 1)},)
+            )
+            await router.send_and_get_reply(select_sources_msg)
+
+            # Start the stream
+            start_msg = new_method_call(
+                session_addr, 'Start', 's', ('',)
+            )
+            reply = await router.send_and_get_reply(start_msg)
+            streams = reply.body[1]
+            node_id = streams['streams'][0][1]
+
+            print(f"PipeWire node ID: {node_id}")
+            return node_id
+    except Exception as e:
+        print(f"Error getting PipeWire node ID: {e}")
+        return None
+
+def get_gstreamer_pipeline(quality, client_ip, node_id):
+    bitrate = 8000
+    if quality == "Low":
+        bitrate = 2000
+    elif quality == "Medium":
+        bitrate = 4000
+    elif quality == "High":
+        bitrate = 8000
+    
     pipeline_str = (
-        "pipewiresrc ! "
+        f"pipewiresrc path={node_id} ! "
         "videoconvert ! "
         "video/x-raw,format=NV12 ! "
-        "vaapih264enc rate-control=cbr bitrate=8000 ! "
+        f"vaapih264enc rate-control=cbr bitrate={bitrate} ! "
         "h264parse ! "
         "rtph264pay pt=96 ! "
         f"udpsink host={client_ip} port=5000 sync=false"
     )
+    return pipeline_str
+
+def start_tablet_stream(client_ip, quality, node_id):
+    pipeline_str = get_gstreamer_pipeline(quality, client_ip, node_id)
     print(f"Starting GStreamer pipeline: {pipeline_str}")
-    
-    # Use subprocess.Popen to run the gst-launch-1.0 command
-    # This detaches the GStreamer pipeline from the Python script's GObject loop,
-    # which is important since we are now running uvicorn in the main thread (or a separate thread).
     cmd = ["gst-launch-1.0"] + pipeline_str.split()
     return subprocess.Popen(cmd)
 
@@ -74,7 +122,15 @@ sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 app = FastAPI()
 app = ASGIApp(sio, app)
 
-mouse = MouseController()
+# --- Uinput Setup ---
+device = uinput.Device([
+    uinput.ABS_X + (0, SCREEN_WIDTH, 0, 0),
+    uinput.ABS_Y + (0, SCREEN_HEIGHT, 0, 0),
+    uinput.ABS_PRESSURE + (0, 255, 0, 0),
+    uinput.BTN_TOUCH,
+    uinput.BTN_TOOL_PEN,
+])
+
 keyboard = KeyboardController()
 
 gst_process = None
@@ -83,10 +139,22 @@ gst_process = None
 async def connect(sid, environ):
     global gst_process
     client_ip = environ['asgi.scope']['client'][0]
-    print(f"Client connected: {sid}, IP: {client_ip}")
+    query_string = environ.get('query_string', b'').decode()
+    query_params = parse_qs(query_string)
+    quality = query_params.get('quality', ['Medium'])[0]
+    
+    print(f"Client connected: {sid}, IP: {client_ip}, Quality: {quality}")
+
+    await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
+
+    node_id = await get_pipewire_node_id()
+    if not node_id:
+        print("Failed to get PipeWire node ID. Cannot start stream.")
+        return
+
     if gst_process:
         gst_process.terminate()
-    gst_process = start_tablet_stream(client_ip)
+    gst_process = start_tablet_stream(client_ip, quality, node_id)
 
 @sio.event
 async def disconnect(sid):
@@ -96,42 +164,75 @@ async def disconnect(sid):
         gst_process.terminate()
         gst_process = None
 
-# Note: start_stream and stop_stream are no longer needed as the client will connect to RTSP directly
-
 @sio.event
-async def mouse_move(sid, x, y):
+async def mouse_move(sid, x, y, pressure):
     try:
-        real_x = x * SCREEN_WIDTH
-        real_y = y * SCREEN_HEIGHT
-        mouse.position = (real_x, real_y)
+        real_x = int(x * SCREEN_WIDTH)
+        real_y = int(y * SCREEN_HEIGHT)
+        device.emit(uinput.ABS_X, real_x)
+        device.emit(uinput.ABS_Y, real_y)
+        device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
     except Exception as e:
         print(f"Error processing mouse_move event: {e}")
 
 @sio.event
-async def mouse_down(sid, x, y):
+async def mouse_down(sid, x, y, pressure):
     try:
-        real_x = x * SCREEN_WIDTH
-        real_y = y * SCREEN_HEIGHT
-        mouse.position = (real_x, real_y)
-        mouse.press(Button.left)
+        real_x = int(x * SCREEN_WIDTH)
+        real_y = int(y * SCREEN_HEIGHT)
+        device.emit(uinput.ABS_X, real_x)
+        device.emit(uinput.ABS_Y, real_y)
+        device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
+        device.emit(uinput.BTN_TOUCH, 1)
     except Exception as e:
         print(f"Error processing mouse_down event: {e}")
 
 @sio.event
 async def mouse_up(sid):
     try:
-        mouse.release(Button.left)
+        device.emit(uinput.BTN_TOUCH, 0)
     except Exception as e:
         print(f"Error processing mouse_up event: {e}")
 
 @sio.event
 async def right_click(sid):
     try:
-        mouse.click(Button.right)
+        keyboard.press(Key.ctrl)
+        keyboard.press(Key.shift)
+        keyboard.press(Key.f10)
+        keyboard.release(Key.f10)
+        keyboard.release(Key.shift)
+        keyboard.release(Key.ctrl)
     except Exception as e:
         print(f"Error processing right_click event: {e}")
 
-# ... other input event handlers (undo, redo, etc.) ...
+@sio.event
+async def middle_click(sid):
+    try:
+        keyboard.press(Key.shift)
+        keyboard.press(Key.f10)
+        keyboard.release(Key.f10)
+        keyboard.release(Key.shift)
+    except Exception as e:
+        print(f"Error processing middle_click event: {e}")
+
+@sio.event
+async def undo(sid):
+    try:
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('z')
+            keyboard.release('z')
+    except Exception as e:
+        print(f"Error processing undo event: {e}")
+
+@sio.event
+async def redo(sid):
+    try:
+        with keyboard.pressed(Key.ctrl):
+            keyboard.press('y')
+            keyboard.release('y')
+    except Exception as e:
+        print(f"Error processing redo event: {e}")
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -154,7 +255,6 @@ if __name__ == "__main__":
     print(f"Socket.IO server running at: {ip_address}:8000")
     print("-------------------------")
 
-    # Get screen resolution
     resolution = get_screen_resolution_wayland()
     if resolution:
         SCREEN_WIDTH, SCREEN_HEIGHT = resolution
@@ -162,12 +262,10 @@ if __name__ == "__main__":
     else:
         print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
-    # Start the FastAPI/Socket.IO server in a separate thread
     socketio_thread = Thread(target=run_socketio_server)
     socketio_thread.daemon = True
     socketio_thread.start()
 
-    # Keep the main thread alive to allow the Socket.IO thread to run
     try:
         while True:
             import time

@@ -4,5 +4,7 @@ python-socketio
 pynput
 mss
 Pillow
-rtsp-server
 PyGObject
+python-uinput
+dbus-python
+jeepney
