@@ -1,7 +1,6 @@
 import asyncio
 import socket
 from threading import Thread
-import subprocess
 from urllib.parse import parse_qs
 
 import uvicorn
@@ -12,7 +11,9 @@ from socketio import ASGIApp, AsyncServer
 
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst
+from gi.repository import Gst, GLib
+gi.require_version('GstRtspServer', '1.0')
+from gi.repository import GstRtspServer
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
 
@@ -67,8 +68,16 @@ async def get_pipewire_node_id():
                 portal_addr, 'CreateSession', 'a{sv}', ({},)
             )
             reply = await router.send_and_get_reply(create_session_msg)
-            session_handle = reply.body[0]
-            session_addr = portal_addr.replace(path=session_handle)
+            
+            # The reply contains the object path for the new session
+            session_handle = reply.body[0] 
+
+            # FIX: Create a NEW DBusAddress for the session instead of using .replace()
+            session_addr = DBusAddress(
+                session_handle, # Use the new path here
+                bus_name='org.freedesktop.portal.Desktop',
+                interface='org.freedesktop.portal.ScreenCast'
+            )
 
             # Select sources
             select_sources_msg = new_method_call(
@@ -91,31 +100,24 @@ async def get_pipewire_node_id():
         print(f"Error getting PipeWire node ID: {e}")
         return None
 
-def get_gstreamer_pipeline(quality, client_ip, node_id):
-    bitrate = 8000
-    if quality == "Low":
-        bitrate = 2000
-    elif quality == "Medium":
-        bitrate = 4000
-    elif quality == "High":
-        bitrate = 8000
-    
+def get_gstreamer_pipeline(node_id):
     pipeline_str = (
         f"pipewiresrc path={node_id} ! "
         "videoconvert ! "
         "video/x-raw,format=NV12 ! "
-        f"vaapih264enc rate-control=cbr bitrate={bitrate} ! "
-        "h264parse ! "
-        "rtph264pay pt=96 ! "
-        f"udpsink host={client_ip} port=5000 sync=false"
+        "vaapih264enc rate-control=cbr bitrate=8000 ! "
+        "rtph264pay name=pay0 pt=96"
     )
     return pipeline_str
 
-def start_tablet_stream(client_ip, quality, node_id):
-    pipeline_str = get_gstreamer_pipeline(quality, client_ip, node_id)
-    print(f"Starting GStreamer pipeline: {pipeline_str}")
-    cmd = ["gst-launch-1.0"] + pipeline_str.split()
-    return subprocess.Popen(cmd)
+class GstServer(GstRtspServer.RTSPServer):
+    def __init__(self, **properties):
+        super().__init__(**properties)
+        self.factory = GstRtspServer.RTSPMediaFactory()
+        self.factory.set_launch_string(get_gstreamer_pipeline(None))
+        self.factory.set_shared(True)
+        self.get_mount_points().add_factory("/test", self.factory)
+        self.attach(None)
 
 # --- Socket.IO Setup ---
 sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -133,11 +135,11 @@ device = uinput.Device([
 
 keyboard = KeyboardController()
 
-gst_process = None
+gst_server = None
 
 @sio.event
 async def connect(sid, environ):
-    global gst_process
+    global gst_server
     client_ip = environ['asgi.scope']['client'][0]
     query_string = environ.get('query_string', b'').decode()
     query_params = parse_qs(query_string)
@@ -151,18 +153,23 @@ async def connect(sid, environ):
     if not node_id:
         print("Failed to get PipeWire node ID. Cannot start stream.")
         return
+    
+    if gst_server:
+        # We don't need to do anything here as the server is already running
+        pass
+    else:
+        gst_server = GstServer()
 
-    if gst_process:
-        gst_process.terminate()
-    gst_process = start_tablet_stream(client_ip, quality, node_id)
+    # Update the pipeline with the correct node_id
+    gst_server.factory.set_launch_string(get_gstreamer_pipeline(node_id))
+    print(f"RTSP stream available at: rtsp://{get_ip_address()}:8554/test")
 
 @sio.event
 async def disconnect(sid):
-    global gst_process
+    global gst_server
     print(f"Client disconnected: {sid}")
-    if gst_process:
-        gst_process.terminate()
-        gst_process = None
+    # No need to do anything here as the RTSP server keeps running
+    pass
 
 @sio.event
 async def mouse_move(sid, x, y, pressure):
@@ -266,12 +273,12 @@ if __name__ == "__main__":
     socketio_thread.daemon = True
     socketio_thread.start()
 
+    loop = GLib.MainLoop()
     try:
-        while True:
-            import time
-            time.sleep(1)
+        loop.run()
     except KeyboardInterrupt:
         print("Shutting down server.")
-        if gst_process:
-            gst_process.terminate()
-            gst_process.wait()
+        if gst_server:
+            gst_server.factory.set_launch_string("videotestsrc ! rtph264pay name=pay0 pt=96") # Stop the stream
+            gst_server.get_mount_points().remove_factory("/test")
+        loop.quit()
