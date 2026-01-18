@@ -88,7 +88,7 @@ class MainActivity : ComponentActivity() {
                             exoPlayer?.addListener(playerListener)
                             
                             // For RTP over UDP, Media3 handles it automatically
-                            val rtpUri = "rtp://0.0.0.0:5000" // Listen on all interfaces
+                            val rtpUri = "udp://0.0.0.0:5000" // Listen on all interfaces
                             val dataSourceFactory: DataSource.Factory =
                                 DataSource.Factory { UdpDataSource() }
                             val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)

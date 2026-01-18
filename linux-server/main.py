@@ -9,17 +9,13 @@ from fastapi import FastAPI
 from pynput.keyboard import Key, Controller as KeyboardController
 from socketio import ASGIApp, AsyncServer
 
+from udp_streamer import WaylandUdpServer
+
 import gi
 gi.require_version('Gst', '1.0')
-from gi.repository import Gst, GLib
-gi.require_version('GstRtspServer', '1.0')
-from gi.repository import GstRtspServer
+from gi.repository import Gst
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk
-
-from jeepney import DBusAddress, new_method_call
-from jeepney.io.asyncio import open_dbus_router
-from jeepney.low_level import Variant
 
 # Initialize GStreamer
 Gst.init(None)
@@ -27,6 +23,7 @@ Gst.init(None)
 # Global variables
 SCREEN_WIDTH = 1920
 SCREEN_HEIGHT = 1080
+udp_server = None
 
 def get_screen_resolution_wayland():
     """
@@ -51,74 +48,6 @@ def get_screen_resolution_wayland():
         print(f"An error occurred while getting screen resolution: {e}")
     return None
 
-async def get_pipewire_node_id():
-    """
-    Uses jeepney to request a screen cast session and returns the PipeWire node ID.
-    """
-    try:
-        portal_addr = DBusAddress(
-            '/org/freedesktop/portal/desktop',
-            bus_name='org.freedesktop.portal.Desktop',
-            interface='org.freedesktop.portal.ScreenCast'
-        )
-
-        async with open_dbus_router(bus='SESSION') as router:
-            # Create a session
-            create_session_msg = new_method_call(
-                portal_addr, 'CreateSession', 'a{sv}', ({},)
-            )
-            reply = await router.send_and_get_reply(create_session_msg)
-            
-            # The reply contains the object path for the new session
-            session_handle = reply.body[0] 
-
-            # FIX: Create a NEW DBusAddress for the session instead of using .replace()
-            session_addr = DBusAddress(
-                session_handle, # Use the new path here
-                bus_name='org.freedesktop.portal.Desktop',
-                interface='org.freedesktop.portal.ScreenCast'
-            )
-
-            # Select sources
-            select_sources_msg = new_method_call(
-                session_addr, 'SelectSources', 'a{sv}',
-                ({'multiple': Variant('b', False), 'types': Variant('u', 1)},)
-            )
-            await router.send_and_get_reply(select_sources_msg)
-
-            # Start the stream
-            start_msg = new_method_call(
-                session_addr, 'Start', 's', ('',)
-            )
-            reply = await router.send_and_get_reply(start_msg)
-            streams = reply.body[1]
-            node_id = streams['streams'][0][1]
-
-            print(f"PipeWire node ID: {node_id}")
-            return node_id
-    except Exception as e:
-        print(f"Error getting PipeWire node ID: {e}")
-        return None
-
-def get_gstreamer_pipeline(node_id):
-    pipeline_str = (
-        f"pipewiresrc path={node_id} ! "
-        "videoconvert ! "
-        "video/x-raw,format=NV12 ! "
-        "vaapih264enc rate-control=cbr bitrate=8000 ! "
-        "rtph264pay name=pay0 pt=96"
-    )
-    return pipeline_str
-
-class GstServer(GstRtspServer.RTSPServer):
-    def __init__(self, **properties):
-        super().__init__(**properties)
-        self.factory = GstRtspServer.RTSPMediaFactory()
-        self.factory.set_launch_string(get_gstreamer_pipeline(None))
-        self.factory.set_shared(True)
-        self.get_mount_points().add_factory("/test", self.factory)
-        self.attach(None)
-
 # --- Socket.IO Setup ---
 sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 app = FastAPI()
@@ -135,11 +64,9 @@ device = uinput.Device([
 
 keyboard = KeyboardController()
 
-gst_server = None
-
 @sio.event
 async def connect(sid, environ):
-    global gst_server
+    global udp_server
     client_ip = environ['asgi.scope']['client'][0]
     query_string = environ.get('query_string', b'').decode()
     query_params = parse_qs(query_string)
@@ -149,27 +76,23 @@ async def connect(sid, environ):
 
     await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
 
-    node_id = await get_pipewire_node_id()
-    if not node_id:
-        print("Failed to get PipeWire node ID. Cannot start stream.")
-        return
-    
-    if gst_server:
-        # We don't need to do anything here as the server is already running
-        pass
+    if udp_server is None:
+        print("Starting UDP server...")
+        # Start the UDP server in a separate thread
+        udp_server = WaylandUdpServer(target_ip=client_ip, port=5000)
+        udp_server.start()
+        udp_server.run_loop()
     else:
-        gst_server = GstServer()
-
-    # Update the pipeline with the correct node_id
-    gst_server.factory.set_launch_string(get_gstreamer_pipeline(node_id))
-    print(f"RTSP stream available at: rtsp://{get_ip_address()}:8554/test")
+        print("UDP server already running.")
 
 @sio.event
 async def disconnect(sid):
-    global gst_server
+    global udp_server
     print(f"Client disconnected: {sid}")
-    # No need to do anything here as the RTSP server keeps running
-    pass
+    if udp_server:
+        print("Stopping UDP server...")
+        udp_server.stop()
+        udp_server = None
 
 @sio.event
 async def mouse_move(sid, x, y, pressure):
@@ -273,12 +196,12 @@ if __name__ == "__main__":
     socketio_thread.daemon = True
     socketio_thread.start()
 
-    loop = GLib.MainLoop()
+    # The GLib main loop is now managed by WaylandUdpServer
+    # We just need to keep the main thread alive.
     try:
-        loop.run()
+        while True:
+            asyncio.sleep(1)
     except KeyboardInterrupt:
         print("Shutting down server.")
-        if gst_server:
-            gst_server.factory.set_launch_string("videotestsrc ! rtph264pay name=pay0 pt=96") # Stop the stream
-            gst_server.get_mount_points().remove_factory("/test")
-        loop.quit()
+        if udp_server:
+            udp_server.stop()
