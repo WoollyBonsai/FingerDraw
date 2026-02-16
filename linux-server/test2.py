@@ -1,11 +1,10 @@
 import gi
 gi.require_version('Gst', '1.0')
-gi.require_version('GstPbutils', '1.0')
-from gi.repository import Gst, GLib, GstPbutils, GObject
+gi.require_version('GstPbutils', '1.0') # Fix the version warning
+from gi.repository import Gst, GLib, GstPbutils
 import sys
 import dbus
 import dbus.mainloop.glib
-from threading import Thread
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 Gst.init(None)
@@ -39,11 +38,13 @@ class WaylandUdpServer:
         self.bus.add_signal_receiver(self.on_create_session, "Response", 
                                    "org.freedesktop.portal.Request", path=request_path)
         print("Awaiting Portal Authorization for UDP Streaming...")
+        try:
+            self.loop.run()
+        except KeyboardInterrupt:
+            print("\nShutting down UDP streamer...")
+            self.stop()
+            print("Streamer shut down.")
 
-    def run_loop(self):
-        """Runs the GLib main loop in a separate thread."""
-        self.loop_thread = Thread(target=self.loop.run)
-        self.loop_thread.start()
 
     def on_create_session(self, response, results):
         if response != 0: 
@@ -108,3 +109,9 @@ class WaylandUdpServer:
         err, debug = msg.parse_error()
         print(f"PIPELINE ERROR: {err.message}")
         self.stop()
+
+if __name__ == "__main__":
+    # Default to localhost if no IP is provided as a command-line argument
+    target_ip = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
+    server = WaylandUdpServer(target_ip=target_ip)
+    server.start()

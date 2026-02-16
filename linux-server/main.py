@@ -1,5 +1,6 @@
 import asyncio
 import socket
+import time
 from threading import Thread
 from urllib.parse import parse_qs
 
@@ -73,6 +74,7 @@ async def connect(sid, environ):
     quality = query_params.get('quality', ['Medium'])[0]
     
     print(f"Client connected: {sid}, IP: {client_ip}, Quality: {quality}")
+    print(f"*** Starting UDP stream to client at {client_ip}:5000 ***")
 
     await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
 
@@ -196,12 +198,12 @@ if __name__ == "__main__":
     socketio_thread.daemon = True
     socketio_thread.start()
 
-    # The GLib main loop is now managed by WaylandUdpServer
     # We just need to keep the main thread alive.
     try:
         while True:
-            asyncio.sleep(1)
+            time.sleep(1)
     except KeyboardInterrupt:
-        print("Shutting down server.")
+        print("\nShutting down server...")
         if udp_server:
             udp_server.stop()
+        print("Server shut down.")
