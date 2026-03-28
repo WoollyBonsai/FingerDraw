@@ -5,11 +5,13 @@
 /android-client/app/*.jks
 /android-client/local.properties
 /android-client/sdk
+*.apk
+*.aab
 
 # Python
 /linux-server/venv
 /windows-server/venv
-/__pycache__/
+**/__pycache__/
 *.pyc
 
 # Windows
@@ -23,8 +25,18 @@
 *.iml
 *.ipr
 
+# Media & Large Files (test_videos, video_output)
+*.mp4
+*.mkv
+*.avi
+*.mov
+/linux-server/test_output.mp4
+/linux-server/video_with_audio.mp4
+*.sdp
+
 # Other
 *~
+*.log
 Suggestions.md
 Working-Proc.md
 linux-server/insttall-gstremersdk.md
