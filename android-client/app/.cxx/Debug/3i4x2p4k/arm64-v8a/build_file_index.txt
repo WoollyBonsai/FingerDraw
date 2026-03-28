@@ -1,0 +1,1 @@
+/home/woolly/Work/FingerDraw/android-client/app/src/main/jni/CMakeLists.txt

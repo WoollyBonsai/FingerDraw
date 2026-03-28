@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import socket
 import time
@@ -177,33 +178,83 @@ def get_ip_address():
         s.close()
     return ip
 
-def run_socketio_server():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+def run_socketio_server(host, port):
+    uvicorn.run(app, host=host, port=port)
 
 # --- Main Application ---
 if __name__ == "__main__":
-    ip_address = get_ip_address()
-    print("--- FingerDraw Server ---")
-    print(f"Socket.IO server running at: {ip_address}:8000")
-    print("-------------------------")
+    parser = argparse.ArgumentParser(description="FingerDraw Server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host IP to bind the server to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to run the Socket.IO server on")
+    parser.add_argument("--local-test", action="store_true", help="Run in local test mode, streaming to 127.0.0.1:5000")
+    args = parser.parse_args()
 
-    resolution = get_screen_resolution_wayland()
-    if resolution:
-        SCREEN_WIDTH, SCREEN_HEIGHT = resolution
-        print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+    if args.local_test:
+        print("--- FingerDraw Server: Local Test Mode ---")
+        print("INFO: Streaming to rtp://127.0.0.1:5000")
+        print("INFO: Open the stream.sdp file with VLC to view.")
+        print("------------------------------------------")
+
+        resolution = get_screen_resolution_wayland()
+        if resolution:
+            SCREEN_WIDTH, SCREEN_HEIGHT = resolution
+            print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+        else:
+            print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+        
+        udp_server = WaylandUdpServer(target_ip="127.0.0.1", port=5000)
+        udp_server.start()
+        
+        print("Press Ctrl+C to stop the stream.")
+        try:
+            # The GLib main loop is running in a background thread in WaylandUdpServer
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nShutting down server...")
+            if udp_server:
+                udp_server.stop()
+            print("Server shut down.")
+
     else:
-        print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+        # --- Startup Information ---
+        print("--- FingerDraw Server ---")
+        if args.host == "0.0.0.0":
+            print(f"INFO: Listening on all network interfaces.")
+            try:
+                primary_ip = get_ip_address()
+                print(f"INFO: Your primary IP appears to be: {primary_ip}")
+            except Exception:
+                pass
+        else:
+            primary_ip = args.host
+        
+        print(f"\n== Configuration ==")
+        print(f"Socket.IO Server: http://{primary_ip}:{args.port}")
+        print(f"RTP Stream Target: Client's IP on port 5000 (determined on connection)")
+        print("===================\n")
+        print("To connect from your Android client, use the IP address shown above.")
+        print("To stop the server, press Ctrl+C.")
+        print("---------------------------------")
 
-    socketio_thread = Thread(target=run_socketio_server)
-    socketio_thread.daemon = True
-    socketio_thread.start()
 
-    # We just need to keep the main thread alive.
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down server...")
-        if udp_server:
-            udp_server.stop()
-        print("Server shut down.")
+        resolution = get_screen_resolution_wayland()
+        if resolution:
+            SCREEN_WIDTH, SCREEN_HEIGHT = resolution
+            print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+        else:
+            print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
+
+        socketio_thread = Thread(target=run_socketio_server, args=(args.host, args.port))
+        socketio_thread.daemon = True
+        socketio_thread.start()
+
+        # We just need to keep the main thread alive.
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("\nShutting down server...")
+            if udp_server:
+                udp_server.stop()
+            print("Server shut down.")

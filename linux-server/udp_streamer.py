@@ -84,7 +84,7 @@ class WaylandUdpServer:
             videoscale !
             capsfilter caps="video/x-raw,width=1920,height=1080" !
             videorate !
-            capsfilter caps="video/x-raw,framerate=120/1" !
+            capsfilter caps="video/x-raw,framerate=30/1" !
             nvh264enc gop-size=1 bframes=0 bitrate=30000 preset=low-latency rc-mode=cbr ! 
             rtph264pay config-interval=1 !
             udpsink host={self.target_ip} port={self.port} sync=false
