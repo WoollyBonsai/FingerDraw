@@ -73,7 +73,11 @@ async def connect(sid, environ):
 
     if udp_server is None:
         print(f"Starting UDP stream to {client_ip}:5000")
-        udp_server = WaylandUdpServer(target_ip=client_ip, port=5000)
+        # Maintain aspect ratio for the stream, capping width at 1280 for performance
+        stream_w = 1280
+        stream_h = int(stream_w * (SCREEN_HEIGHT / SCREEN_WIDTH))
+        
+        udp_server = WaylandUdpServer(target_ip=client_ip, port=5000, width=stream_w, height=stream_h)
         udp_server.start()
         udp_server.run_loop()
 
@@ -87,31 +91,36 @@ async def disconnect(sid):
 @sio.event
 async def mouse_move(sid, x, y, pressure):
     try:
-        # Map normalized 0.0-1.0 to screen pixels
-        real_x = int(x * SCREEN_WIDTH)
-        real_y = int(y * SCREEN_HEIGHT)
-        device.emit(uinput.ABS_X, real_x)
-        device.emit(uinput.ABS_Y, real_y)
-        device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
+        if device:
+            # Map normalized 0.0-1.0 to screen pixels
+            real_x = int(x * SCREEN_WIDTH)
+            real_y = int(y * SCREEN_HEIGHT)
+            device.emit(uinput.ABS_X, real_x)
+            device.emit(uinput.ABS_Y, real_y)
+            device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
     except Exception as e:
         print(f"Error in mouse_move: {e}")
 
 @sio.event
 async def mouse_down(sid, x, y, pressure):
     try:
-        real_x = int(x * SCREEN_WIDTH)
-        real_y = int(y * SCREEN_HEIGHT)
-        device.emit(uinput.ABS_X, real_x)
-        device.emit(uinput.ABS_Y, real_y)
-        device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
-        device.emit(uinput.BTN_TOUCH, 1)
+        if device:
+            real_x = int(x * SCREEN_WIDTH)
+            real_y = int(y * SCREEN_HEIGHT)
+            device.emit(uinput.BTN_TOOL_PEN, 1)
+            device.emit(uinput.ABS_X, real_x)
+            device.emit(uinput.ABS_Y, real_y)
+            device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
+            device.emit(uinput.BTN_TOUCH, 1)
     except Exception as e:
         print(f"Error in mouse_down: {e}")
 
 @sio.event
 async def mouse_up(sid):
     try:
-        device.emit(uinput.BTN_TOUCH, 0)
+        if device:
+            device.emit(uinput.BTN_TOUCH, 0)
+            device.emit(uinput.BTN_TOOL_PEN, 0)
     except Exception as e:
         print(f"Error in mouse_up: {e}")
 

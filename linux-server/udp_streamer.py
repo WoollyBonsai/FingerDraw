@@ -105,7 +105,7 @@ class WaylandUdpServer:
             queue leaky=downstream max-size-buffers=1 !
             videoconvert !
             videoscale !
-            video/x-raw,width=1280,height=720 !
+            video/x-raw,width={self.width},height={self.height} !
             videoconvert !
             x264enc tune=zerolatency bitrate=3000 speed-preset=ultrafast ! 
             video/x-h264,profile=baseline !

@@ -13,7 +13,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.example.fingerdraw.databinding.ActivityMainBinding
 import io.socket.client.IO
 import io.socket.client.Socket
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
 import java.net.URISyntaxException
+import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,10 +29,15 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var wifiLock: WifiManager.WifiLock? = null
     private var multicastLock: WifiManager.MulticastLock? = null
 
-    // Socket.IO
+    // Network
     private var mSocket: Socket? = null
-    // UPDATED TO YOUR PC'S ACTUAL IP
-    private val serverUrl = "http://172.16.217.118:8000" 
+    private val serverUrl = "http://172.16.35.250:8000" 
+    private val serverIpOnly = "172.16.35.250"
+    private val udpPort = 9999
+    
+    // UDP Input
+    private val executor = Executors.newSingleThreadExecutor()
+    private var udpSocket: DatagramSocket? = null
 
     // Interaction State
     private var isPenMode = false
@@ -44,9 +53,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Make touch overlay transparent again
+        binding.touchOverlay.setBackgroundColor(Color.TRANSPARENT)
+
         setupImmersiveMode()
         setupLocks()
         setupSocket()
+        setupUdp()
         setupInteractions()
 
         // Initialize GStreamer
@@ -79,9 +92,32 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
 
             mSocket?.connect()
-            Log.d("FingerDraw", "Socket connection initiated to $serverUrl")
         } catch (e: URISyntaxException) {
             Log.e("FingerDraw", "Socket.IO URI error", e)
+        }
+    }
+
+    private fun setupUdp() {
+        executor.execute {
+            try {
+                udpSocket = DatagramSocket()
+                Log.d("FingerDraw", "UDP Socket initialized")
+            } catch (e: Exception) {
+                Log.e("FingerDraw", "UDP Init Error", e)
+            }
+        }
+    }
+
+    private fun sendUdp(msg: String) {
+        executor.execute {
+            try {
+                val data = msg.toByteArray()
+                val address = InetAddress.getByName(serverIpOnly)
+                val packet = DatagramPacket(data, data.size, address, udpPort)
+                udpSocket?.send(packet)
+            } catch (e: Exception) {
+                // Ignore send errors during high-frequency movement
+            }
         }
     }
 
@@ -116,15 +152,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
 
         binding.btnPen.setOnClickListener {
-            isPenMode = !isPenMode
-            if (isPenMode) {
-                binding.btnPen.setBackgroundColor(Color.parseColor("#4CAF50"))
-                Log.d("FingerDraw", "Pen Mode: ON")
-            } else {
-                binding.btnPen.setBackgroundColor(Color.TRANSPARENT)
-                Log.d("FingerDraw", "Pen Mode: OFF")
-            }
+            setPenMode(true)
         }
+
+        binding.btnPointer.setOnClickListener {
+            setPenMode(false)
+        }
+
+        setPenMode(false)
 
         scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
@@ -161,20 +196,46 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
+    private fun setPenMode(enabled: Boolean) {
+        isPenMode = enabled
+        if (isPenMode) {
+            binding.btnPen.setBackgroundColor(Color.parseColor("#4CAF50"))
+            binding.btnPointer.setBackgroundColor(Color.TRANSPARENT)
+            Log.d("FingerDraw", "Pen Mode: ON")
+        } else {
+            binding.btnPen.setBackgroundColor(Color.TRANSPARENT)
+            binding.btnPointer.setBackgroundColor(Color.parseColor("#4CAF50"))
+            Log.d("FingerDraw", "Pen Mode: OFF")
+        }
+    }
+
     private fun handlePenTouch(event: MotionEvent) {
-        val x = event.x / binding.touchOverlay.width
-        val y = event.y / binding.touchOverlay.height
+        val w = binding.touchOverlay.width.toFloat()
+        val h = binding.touchOverlay.height.toFloat()
+        
+        if (w <= 0 || h <= 0) return
+
+        // Inverse transform to find coordinates on the original unscaled video
+        val xInitial = (event.x - translateX - w / 2f) / scaleFactor + w / 2f
+        val yInitial = (event.y - translateY - h / 2f) / scaleFactor + h / 2f
+        
+        val xNorm = xInitial / w
+        val yNorm = yInitial / h
         val pressure = event.pressure
+
+        // Clamp values between 0 and 1
+        val finalX = max(0f, min(xNorm, 1f))
+        val finalY = max(0f, min(yNorm, 1f))
 
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
-                mSocket?.emit("mouse_down", x, y, pressure)
+                sendUdp("D:$finalX,$finalY,$pressure")
             }
             MotionEvent.ACTION_MOVE -> {
-                mSocket?.emit("mouse_move", x, y, pressure)
+                sendUdp("M:$finalX,$finalY,$pressure")
             }
             MotionEvent.ACTION_UP -> {
-                mSocket?.emit("mouse_up")
+                sendUdp("U")
             }
         }
     }
@@ -213,6 +274,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onDestroy() {
         super.onDestroy()
         mSocket?.disconnect()
+        udpSocket?.close()
+        executor.shutdown()
         if (isGStreamerInitialized) {
             nativeFinalize()
         }
