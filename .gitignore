@@ -2,6 +2,7 @@
 /android-client/app/build
 /android-client/build
 /android-client/.gradle
+/android-client/app/.cxx/
 /android-client/app/*.jks
 /android-client/local.properties
 /android-client/sdk
@@ -33,6 +34,10 @@
 /linux-server/test_output.mp4
 /linux-server/video_with_audio.mp4
 *.sdp
+
+# UI Design Remnants
+/application-ui-dir/
+/input-transmitter/
 
 # Other
 *~

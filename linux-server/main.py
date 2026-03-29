@@ -30,7 +30,6 @@ udp_server = None
 def get_screen_resolution_wayland():
     """
     Gets the screen resolution on a Wayland system using Gdk.
-    Returns a tuple (width, height) or None if unable to determine.
     """
     try:
         display = Gdk.Display.get_default()
@@ -42,10 +41,6 @@ def get_screen_resolution_wayland():
             if monitor:
                 geometry = monitor.get_geometry()
                 return geometry.width, geometry.height
-            else:
-                print("No primary monitor found.")
-        else:
-            print("Could not get default Gdk display.")
     except Exception as e:
         print(f"An error occurred while getting screen resolution: {e}")
     return None
@@ -56,6 +51,7 @@ app = FastAPI()
 app = ASGIApp(sio, app)
 
 # --- Uinput Setup ---
+# Creating a high-resolution input device
 device = uinput.Device([
     uinput.ABS_X + (0, SCREEN_WIDTH, 0, 0),
     uinput.ABS_Y + (0, SCREEN_HEIGHT, 0, 0),
@@ -70,43 +66,35 @@ keyboard = KeyboardController()
 async def connect(sid, environ):
     global udp_server
     client_ip = environ['asgi.scope']['client'][0]
-    query_string = environ.get('query_string', b'').decode()
-    query_params = parse_qs(query_string)
-    quality = query_params.get('quality', ['Medium'])[0]
-    
-    print(f"Client connected: {sid}, IP: {client_ip}, Quality: {quality}")
-    print(f"*** Starting UDP stream to client at {client_ip}:5000 ***")
+    print(f"Client connected: {sid}, IP: {client_ip}")
 
+    # Send resolution to client for mapping (optional)
     await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
 
     if udp_server is None:
-        print("Starting UDP server...")
-        # Start the UDP server in a separate thread
+        print(f"Starting UDP stream to {client_ip}:5000")
         udp_server = WaylandUdpServer(target_ip=client_ip, port=5000)
         udp_server.start()
         udp_server.run_loop()
-    else:
-        print("UDP server already running.")
 
 @sio.event
 async def disconnect(sid):
     global udp_server
     print(f"Client disconnected: {sid}")
-    if udp_server:
-        print("Stopping UDP server...")
-        udp_server.stop()
-        udp_server = None
+    # Note: In a multi-user scenario, we'd count sessions. 
+    # For FingerDraw, one client at a time is the standard.
 
 @sio.event
 async def mouse_move(sid, x, y, pressure):
     try:
+        # Map normalized 0.0-1.0 to screen pixels
         real_x = int(x * SCREEN_WIDTH)
         real_y = int(y * SCREEN_HEIGHT)
         device.emit(uinput.ABS_X, real_x)
         device.emit(uinput.ABS_Y, real_y)
         device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
     except Exception as e:
-        print(f"Error processing mouse_move event: {e}")
+        print(f"Error in mouse_move: {e}")
 
 @sio.event
 async def mouse_down(sid, x, y, pressure):
@@ -118,54 +106,27 @@ async def mouse_down(sid, x, y, pressure):
         device.emit(uinput.ABS_PRESSURE, int(pressure * 255))
         device.emit(uinput.BTN_TOUCH, 1)
     except Exception as e:
-        print(f"Error processing mouse_down event: {e}")
+        print(f"Error in mouse_down: {e}")
 
 @sio.event
 async def mouse_up(sid):
     try:
         device.emit(uinput.BTN_TOUCH, 0)
     except Exception as e:
-        print(f"Error processing mouse_up event: {e}")
+        print(f"Error in mouse_up: {e}")
 
-@sio.event
-async def right_click(sid):
-    try:
-        keyboard.press(Key.ctrl)
-        keyboard.press(Key.shift)
-        keyboard.press(Key.f10)
-        keyboard.release(Key.f10)
-        keyboard.release(Key.shift)
-        keyboard.release(Key.ctrl)
-    except Exception as e:
-        print(f"Error processing right_click event: {e}")
-
-@sio.event
-async def middle_click(sid):
-    try:
-        keyboard.press(Key.shift)
-        keyboard.press(Key.f10)
-        keyboard.release(Key.f10)
-        keyboard.release(Key.shift)
-    except Exception as e:
-        print(f"Error processing middle_click event: {e}")
-
+# Shortcuts
 @sio.event
 async def undo(sid):
-    try:
-        with keyboard.pressed(Key.ctrl):
-            keyboard.press('z')
-            keyboard.release('z')
-    except Exception as e:
-        print(f"Error processing undo event: {e}")
+    with keyboard.pressed(Key.ctrl):
+        keyboard.press('z')
+        keyboard.release('z')
 
 @sio.event
 async def redo(sid):
-    try:
-        with keyboard.pressed(Key.ctrl):
-            keyboard.press('y')
-            keyboard.release('y')
-    except Exception as e:
-        print(f"Error processing redo event: {e}")
+    with keyboard.pressed(Key.ctrl):
+        keyboard.press('y')
+        keyboard.release('y')
 
 def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -178,83 +139,20 @@ def get_ip_address():
         s.close()
     return ip
 
-def run_socketio_server(host, port):
-    uvicorn.run(app, host=host, port=port)
-
-# --- Main Application ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FingerDraw Server")
-    parser.add_argument("--host", default="0.0.0.0", help="Host IP to bind the server to")
-    parser.add_argument("--port", type=int, default=8000, help="Port to run the Socket.IO server on")
-    parser.add_argument("--local-test", action="store_true", help="Run in local test mode, streaming to 127.0.0.1:5000")
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    if args.local_test:
-        print("--- FingerDraw Server: Local Test Mode ---")
-        print("INFO: Streaming to rtp://127.0.0.1:5000")
-        print("INFO: Open the stream.sdp file with VLC to view.")
-        print("------------------------------------------")
+    resolution = get_screen_resolution_wayland()
+    if resolution:
+        SCREEN_WIDTH, SCREEN_HEIGHT = resolution
+        print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
 
-        resolution = get_screen_resolution_wayland()
-        if resolution:
-            SCREEN_WIDTH, SCREEN_HEIGHT = resolution
-            print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
-        else:
-            print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
-        
-        udp_server = WaylandUdpServer(target_ip="127.0.0.1", port=5000)
-        udp_server.start()
-        
-        print("Press Ctrl+C to stop the stream.")
-        try:
-            # The GLib main loop is running in a background thread in WaylandUdpServer
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nShutting down server...")
-            if udp_server:
-                udp_server.stop()
-            print("Server shut down.")
+    print(f"--- FingerDraw Server Running ---")
+    print(f"IP: {get_ip_address()}")
+    print(f"Port: {args.port}")
+    print(f"---------------------------------")
 
-    else:
-        # --- Startup Information ---
-        print("--- FingerDraw Server ---")
-        if args.host == "0.0.0.0":
-            print(f"INFO: Listening on all network interfaces.")
-            try:
-                primary_ip = get_ip_address()
-                print(f"INFO: Your primary IP appears to be: {primary_ip}")
-            except Exception:
-                pass
-        else:
-            primary_ip = args.host
-        
-        print(f"\n== Configuration ==")
-        print(f"Socket.IO Server: http://{primary_ip}:{args.port}")
-        print(f"RTP Stream Target: Client's IP on port 5000 (determined on connection)")
-        print("===================\n")
-        print("To connect from your Android client, use the IP address shown above.")
-        print("To stop the server, press Ctrl+C.")
-        print("---------------------------------")
-
-
-        resolution = get_screen_resolution_wayland()
-        if resolution:
-            SCREEN_WIDTH, SCREEN_HEIGHT = resolution
-            print(f"Detected screen resolution: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
-        else:
-            print(f"Could not detect screen resolution, using defaults: {SCREEN_WIDTH}x{SCREEN_HEIGHT}")
-
-        socketio_thread = Thread(target=run_socketio_server, args=(args.host, args.port))
-        socketio_thread.daemon = True
-        socketio_thread.start()
-
-        # We just need to keep the main thread alive.
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nShutting down server...")
-            if udp_server:
-                udp_server.stop()
-            print("Server shut down.")
+    uvicorn.run(app, host=args.host, port=args.port)
