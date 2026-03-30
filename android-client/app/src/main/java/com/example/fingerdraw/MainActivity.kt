@@ -6,6 +6,7 @@ import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.util.Log
 import android.view.*
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,8 +32,8 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // Network
     private var mSocket: Socket? = null
-    private val serverUrl = "http://172.16.35.250:8000" 
-    private val serverIpOnly = "172.16.35.250"
+    private var serverUrl = "" 
+    private var serverIpOnly = ""
     private val udpPort = 9999
     
     // UDP Input
@@ -50,10 +51,17 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val ip = intent.getStringExtra("SERVER_IP") ?: ""
+        if (ip.isEmpty()) {
+            finish()
+            return
+        }
+        serverIpOnly = ip
+        serverUrl = "http://$ip:8000"
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Make touch overlay transparent again
         binding.touchOverlay.setBackgroundColor(Color.TRANSPARENT)
 
         setupImmersiveMode()
@@ -61,6 +69,11 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         setupSocket()
         setupUdp()
         setupInteractions()
+
+        // Send initial HELO to trigger IP detection on server
+        binding.root.postDelayed({
+            sendUdp("HELO:I_AM_${getLocalIpAddress()}")
+        }, 1000)
 
         // Initialize GStreamer
         try {
@@ -75,6 +88,22 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.surfaceVideo.holder.addCallback(this)
     }
 
+    private fun getLocalIpAddress(): String {
+        return try {
+            val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val ipAddress = wifiManager.connectionInfo.ipAddress
+            String.format(
+                "%d.%d.%d.%d",
+                ipAddress and 0xff,
+                ipAddress shr 8 and 0xff,
+                ipAddress shr 16 and 0xff,
+                ipAddress shr 24 and 0xff
+            )
+        } catch (e: Exception) {
+            "0.0.0.0"
+        }
+    }
+
     private fun setupSocket() {
         try {
             val opts = IO.Options()
@@ -85,8 +114,19 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             
             mSocket?.on(Socket.EVENT_CONNECT) {
                 Log.d("FingerDraw", "CONNECTED to Socket.IO server at $serverUrl")
+                sendUdp("HELO:CONNECTED_VIA_SOCKETIO")
+                runOnUiThread {
+                    Toast.makeText(this, "Connected to Server", Toast.LENGTH_SHORT).show()
+                }
             }
             
+            mSocket?.on("disconnect_ack") {
+                Log.d("FingerDraw", "Server acknowledged disconnect. Closing...")
+                runOnUiThread {
+                    finish()
+                }
+            }
+
             mSocket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
                 Log.e("FingerDraw", "Connection Error: ${args[0]}")
             }
@@ -116,7 +156,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 val packet = DatagramPacket(data, data.size, address, udpPort)
                 udpSocket?.send(packet)
             } catch (e: Exception) {
-                // Ignore send errors during high-frequency movement
+                // Ignore
             }
         }
     }
@@ -137,8 +177,18 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private fun setupInteractions() {
         binding.btnDisconnect.setOnClickListener {
-            mSocket?.disconnect()
-            finish()
+            Log.d("FingerDraw", "Requesting disconnect from server...")
+            mSocket?.emit("disconnect_request")
+            // Timeout safety: if server doesn't respond in 2 seconds, just close
+            binding.root.postDelayed({
+                if (!isFinishing) finish()
+            }, 2000)
+        }
+
+        binding.btnRestartStream.setOnClickListener {
+            Log.d("FingerDraw", "Requesting stream restart...")
+            mSocket?.emit("restart_stream")
+            Toast.makeText(this, "Restarting Stream...", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnPin.setOnClickListener {
@@ -201,11 +251,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (isPenMode) {
             binding.btnPen.setBackgroundColor(Color.parseColor("#4CAF50"))
             binding.btnPointer.setBackgroundColor(Color.TRANSPARENT)
-            Log.d("FingerDraw", "Pen Mode: ON")
         } else {
             binding.btnPen.setBackgroundColor(Color.TRANSPARENT)
             binding.btnPointer.setBackgroundColor(Color.parseColor("#4CAF50"))
-            Log.d("FingerDraw", "Pen Mode: OFF")
         }
     }
 
@@ -223,20 +271,13 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val yNorm = yInitial / h
         val pressure = event.pressure
 
-        // Clamp values between 0 and 1
         val finalX = max(0f, min(xNorm, 1f))
         val finalY = max(0f, min(yNorm, 1f))
 
         when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                sendUdp("D:$finalX,$finalY,$pressure")
-            }
-            MotionEvent.ACTION_MOVE -> {
-                sendUdp("M:$finalX,$finalY,$pressure")
-            }
-            MotionEvent.ACTION_UP -> {
-                sendUdp("U")
-            }
+            MotionEvent.ACTION_DOWN -> sendUdp("D:$finalX,$finalY,$pressure")
+            MotionEvent.ACTION_MOVE -> sendUdp("M:$finalX,$finalY,$pressure")
+            MotionEvent.ACTION_UP -> sendUdp("U")
         }
     }
 

@@ -56,6 +56,16 @@
             <View android:layout_width="16dp" android:layout_height="0dp" />
 
             <ImageButton
+                android:id="@+id/btnRestartStream"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@android:drawable/ic_menu_rotate"
+                android:contentDescription="Restart Stream" />
+            
+            <View android:layout_width="16dp" android:layout_height="0dp" />
+
+            <ImageButton
                 android:id="@+id/btnPin"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
