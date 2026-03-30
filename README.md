@@ -33,4 +33,4 @@ python main.py
 
 ## Requirements
 - **PC**: Linux with PipeWire (Wayland recommended) and a hardware-accelerated H.264 encoder (Intel/AMD/NVIDIA).
-- **Network**: 5GHz Wi-Fi or Ethernet is highly recommended for stable, low-latency performance.
+- **Network**: 5GHz Wi-Fi or Ethernet is highly recommended for stable, low-latency performance. ( Tested on 2.4GHz and it works fine there too. Just jitters in stream ( not input just stream ) when shortage of bandwidth by high usage by user. )
