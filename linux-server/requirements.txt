@@ -1,10 +1,9 @@
 fastapi
 uvicorn
-python-socketio
+python-socketio[asyncio]
 pynput
-mss
-Pillow
 PyGObject
-python-uinput
+evdev
 dbus-python
 jeepney
+aiohttp
