@@ -99,7 +99,7 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz) {
         "rtpjitterbuffer latency=100 ! "
         "rtph264depay ! h264parse ! "
         "openh264dec ! videoconvert ! "
-        "glimagesink name=sink sync=false async=false";
+        "glimagesink name=sink sync=false async=false force-aspect-ratio=false";
 
     pipeline = gst_parse_launch(pipeline_str, &error);
     if (error) {

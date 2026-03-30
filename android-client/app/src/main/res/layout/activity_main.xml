@@ -77,25 +77,10 @@
             android:contentDescription="Disconnect" />
     </LinearLayout>
 
-    <ImageButton
-        android:id="@+id/btnOpenTaskbar"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginStart="8dp"
-        android:background="@drawable/rounded_toolbar_bg"
-        android:src="@android:drawable/ic_menu_view"
-        android:visibility="gone"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:contentDescription="Open Taskbar" />
-
-
     <FrameLayout
         android:id="@+id/streamingSpace"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_margin="16dp"
         android:background="@android:color/black"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -113,5 +98,18 @@
             android:layout_height="match_parent"
             android:background="@android:color/transparent" />
     </FrameLayout>
+
+    <ImageButton
+        android:id="@+id/btnOpenTaskbar"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/rounded_toolbar_bg"
+        android:src="@android:drawable/ic_menu_view"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:contentDescription="Open Taskbar" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

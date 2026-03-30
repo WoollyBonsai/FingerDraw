@@ -27,7 +27,7 @@ ui = None # Initialized in main
 is_pressed = False
 
 # HARDCODED IPs for testing
-ANDROID_IP = "172.16.148.221"
+ANDROID_IP = "172.16.150.107"
 SERVER_IP = "172.16.35.250"
 UDP_INPUT_PORT = 9999
 
