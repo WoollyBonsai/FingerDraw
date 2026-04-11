@@ -57,10 +57,10 @@ class FingerDrawStreamer:
             f"d3d11screencapturesrc capture-api=dxgi do-timestamp=true ! "
             f"queue leaky=downstream max-size-buffers=1 ! "
             f"d3d11convert ! "
-            f"video/x-raw(memory:D3D11Memory),width=1280,height=720,framerate=40/1 ! "
+            f"video/x-raw(memory:D3D11Memory),width=2560,height=1440,framerate=40/1 ! "
             f"d3d11download ! "
             f"video/x-raw,format=I420 ! "
-            f"x264enc bitrate=1500 tune=zerolatency speed-preset=ultrafast ! "
+            f"x264enc bitrate=8000 tune=zerolatency speed-preset=ultrafast ! "
             f"rtph264pay config-interval=1 ! "
             f"udpsink host={target_ip} port={STREAM_PORT} sync=false"
         )

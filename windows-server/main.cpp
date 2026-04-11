@@ -39,10 +39,10 @@ std::string pipe_str =
     "d3d11screencapturesrc ! "
     "queue leaky=downstream max-size-buffers=1 ! "
     "d3d11convert ! "
-    "video/x-raw(memory:D3D11Memory),width=1280,height=720,framerate=40/1 ! "
+    "video/x-raw(memory:D3D11Memory),width=2560,height=1440,framerate=40/1 ! "
     "d3d11download ! "
     "video/x-raw,format=I420 ! "
-    "x264enc bitrate=1500 tune=zerolatency speed-preset=ultrafast ! "
+    "x264enc bitrate=8000 tune=zerolatency speed-preset=ultrafast ! "
     "rtph264pay config-interval=1 ! "
     "udpsink host=" + std::string(target_ip) + " port=5000 sync=false";
 

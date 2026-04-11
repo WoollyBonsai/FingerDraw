@@ -37,6 +37,10 @@ API_PORT = args.api_port
 VIDEO_PORT = args.video_port
 detected_android_ip = None
 
+STREAM_WIDTH = 1280
+STREAM_HEIGHT = 720
+STREAM_BITRATE = 4000
+
 # --- Socket.IO Setup ---
 sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 fastapi_app = FastAPI()
@@ -119,18 +123,24 @@ class FingerDrawServer:
         self.launch_pipeline(fd, node_id)
 
     def launch_pipeline(self, fd, node_id):
-        # Optimized for low latency and lower bandwidth
-        # target-usage=4 is a better balance for quality vs speed
+        global STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE
+        # Optimized for YouTube-like quality with low latency
+        # target-usage=1 ensures maximum encoding quality, vbr prevents blockiness
+        
+        if STREAM_WIDTH and STREAM_HEIGHT:
+            scale_caps = f"videoscale !\n            video/x-raw,width={STREAM_WIDTH},height={STREAM_HEIGHT},framerate=60/1,format=I420"
+        else:
+            scale_caps = "video/x-raw,framerate=60/1,format=I420"
+
         pipeline_str = f"""
             pipewiresrc fd={fd} path={node_id} do-timestamp=true !
             queue leaky=downstream max-size-buffers=1 !
             videoconvert !
             videorate !
-            videoscale !
-            video/x-raw,width=1280,height=720,framerate=40/1,format=I420 !
+            {scale_caps} !
             videoconvert !
             video/x-raw,format=NV12 !
-            vah264enc bitrate=1500 rate-control=cbr target-usage=4 ! 
+            vah264enc bitrate={STREAM_BITRATE} rate-control=vbr target-usage=1 ! 
             rtph264pay config-interval=1 !
             udpsink host={self.target_ip} port={self.port} sync=false
         """
@@ -256,6 +266,26 @@ def get_local_ips():
         return []
 
 if __name__ == "__main__":
+    print("\n--- Stream Quality Selection ---")
+    print("1. 480p (854x480, 4Mbps - High Quality)")
+    print("2. 720p (1280x720, 8Mbps - High Quality)")
+    print("3. 1080p (1920x1080, 16Mbps - High Quality)")
+    print("4. System Resolution (Native, 25Mbps - Max Quality)")
+    try:
+        choice = input("Select quality (1-4) [default: 2]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        choice = '2'
+        print()
+
+    if choice == '1':
+        STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = 854, 480, 4000
+    elif choice == '3':
+        STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = 1920, 1080, 16000
+    elif choice == '4':
+        STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = None, None, 25000
+    else:
+        STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = 1280, 720, 8000
+
     capabilities = {
         e.EV_KEY: [e.BTN_TOUCH],
         e.EV_ABS: [
