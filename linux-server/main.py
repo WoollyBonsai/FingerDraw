@@ -112,17 +112,17 @@ class FingerDrawServer:
 
     def launch_pipeline(self, fd, node_id):
         # Optimized for low latency and lower bandwidth
-        # target-usage=7 is fastest encoding
+        # target-usage=4 is a better balance for quality vs speed
         pipeline_str = f"""
             pipewiresrc fd={fd} path={node_id} do-timestamp=true !
             queue leaky=downstream max-size-buffers=1 !
             videoconvert !
             videorate !
             videoscale !
-            video/x-raw,width=1280,height=720,framerate=50/1,format=I420 !
+            video/x-raw,width=1280,height=720,framerate=40/1,format=I420 !
             videoconvert !
             video/x-raw,format=NV12 !
-            vah264enc bitrate=2000 rate-control=cbr target-usage=7 ! 
+            vah264enc bitrate=1500 rate-control=cbr target-usage=4 ! 
             rtph264pay config-interval=1 !
             udpsink host={self.target_ip} port={self.port} sync=false
         """
@@ -178,6 +178,16 @@ def run_udp_input_listener():
                 ui.write(e.EV_KEY, e.BTN_TOUCH, 0)
                 ui.syn()
                 is_pressed = False
+            elif cmd == 'ALT':
+                state = int(parts[1])
+                if state == 1:
+                    keyboard.press(Key.alt)
+                else:
+                    keyboard.release(Key.alt)
+            elif cmd == 'META':
+                keyboard.tap(Key.cmd)
+            elif cmd == 'TAB':
+                keyboard.tap(Key.tab)
             else:
                 # Debug message
                 pass
@@ -222,6 +232,7 @@ async def disconnect_request(sid):
 @sio.event
 async def disconnect(sid):
     print(f"Client disconnected: {sid}")
+    fd_server.stop()
 
 def run_api():
     uvicorn.run(app, host="0.0.0.0", port=8000)

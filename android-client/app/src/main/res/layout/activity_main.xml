@@ -55,6 +55,36 @@
             
             <View android:layout_width="16dp" android:layout_height="0dp" />
 
+            <Button
+                android:id="@+id/btnAlt"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:text="ALT"
+                android:textColor="@android:color/white" />
+
+            <View android:layout_width="16dp" android:layout_height="0dp" />
+
+            <Button
+                android:id="@+id/btnMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:text="META"
+                android:textColor="@android:color/white" />
+
+            <View android:layout_width="16dp" android:layout_height="0dp" />
+
+            <Button
+                android:id="@+id/btnTab"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:text="TAB"
+                android:textColor="@android:color/white" />
+
+            <View android:layout_width="16dp" android:layout_height="0dp" />
+
             <ImageButton
                 android:id="@+id/btnRestartStream"
                 android:layout_width="40dp"

@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     // Interaction State
     private var isPenMode = false
+    private var isAltPressed = false
     private var scaleFactor = 1.0f
     private var translateX = 0.0f
     private var translateY = 0.0f
@@ -207,6 +208,21 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         binding.btnPointer.setOnClickListener {
             setPenMode(false)
+        }
+
+        binding.btnAlt.setOnClickListener {
+            isAltPressed = !isAltPressed
+            val color = if (isAltPressed) Color.parseColor("#4CAF50") else Color.TRANSPARENT
+            binding.btnAlt.setBackgroundColor(color)
+            sendUdp("ALT:${if (isAltPressed) 1 else 0}")
+        }
+
+        binding.btnMeta.setOnClickListener {
+            sendUdp("META")
+        }
+
+        binding.btnTab.setOnClickListener {
+            sendUdp("TAB")
         }
 
         setPenMode(false)

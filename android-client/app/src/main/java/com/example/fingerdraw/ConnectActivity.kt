@@ -26,7 +26,6 @@ class ConnectActivity : AppCompatActivity() {
                 val intent = Intent(this, MainActivity::class.java)
                 intent.putExtra("SERVER_IP", ip)
                 startActivity(intent)
-                finish()
             }
         }
     }

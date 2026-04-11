@@ -95,8 +95,8 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz) {
 
     // Use openh264dec as a reliable software decoder
     const char *pipeline_str = 
-        "udpsrc port=5000 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
-        "rtpjitterbuffer latency=40 ! "
+        "udpsrc port=5000 buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
+        "rtpjitterbuffer latency=200 ! "
         "rtph264depay ! h264parse ! "
         "openh264dec ! videoconvert ! "
         "glimagesink name=sink sync=false async=false force-aspect-ratio=false";
