@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Settings"
+        android:textColor="#FFFFFF"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Server API Port -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Server API Port (Default: 8000)"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="8dp"/>
+    <EditText
+        android:id="@+id/etApiPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_toolbar_bg"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:inputType="number"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Video UDP Port -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Video Stream Port (Default: 5000)"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="8dp"/>
+    <EditText
+        android:id="@+id/etVideoPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_toolbar_bg"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:inputType="number"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Input UDP Port -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="UDP Input Port (Default: 9999)"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="8dp"/>
+    <EditText
+        android:id="@+id/etInputPort"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_toolbar_bg"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:inputType="number"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Decoder Configuration -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Decoder Element (e.g. openh264dec, amcvideodec-omxqcomvideodecoderavc)"
+        android:textColor="#AAAAAA"
+        android:layout_marginBottom="8dp"/>
+    <EditText
+        android:id="@+id/etDecoder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_toolbar_bg"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:inputType="text"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnVerifyCodec"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#FF9800"
+        android:text="Verify Codec Availability"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:id="@+id/tvCodecStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:layout_marginBottom="24dp"/>
+
+    <Button
+        android:id="@+id/btnSaveSettings"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#4CAF50"
+        android:text="Save configuration"
+        android:textColor="#FFFFFF"/>
+
+</LinearLayout>

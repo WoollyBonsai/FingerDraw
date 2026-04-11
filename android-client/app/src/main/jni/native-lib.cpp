@@ -90,18 +90,24 @@ Java_org_freedesktop_gstreamer_GStreamer_nativeInit(JNIEnv* env, jclass clazz, j
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz) {
+Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz, jint port, jstring decoderName) {
     GError *error = nullptr;
 
-    // Use openh264dec as a reliable software decoder
-    const char *pipeline_str = 
-        "udpsrc port=5000 buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
+    const char *decoder_str = env->GetStringUTFChars(decoderName, 0);
+
+    char pipeline_str[512];
+    snprintf(pipeline_str, sizeof(pipeline_str),
+        "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
         "rtpjitterbuffer latency=200 ! "
         "rtph264depay ! h264parse ! "
-        "openh264dec ! videoconvert ! "
-        "glimagesink name=sink sync=false async=false force-aspect-ratio=false";
+        "%s ! videoconvert ! "
+        "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
+        port, decoder_str);
 
     pipeline = gst_parse_launch(pipeline_str, &error);
+    
+    env->ReleaseStringUTFChars(decoderName, decoder_str);
+
     if (error) {
         LOGE("Error creating pipeline: %s", error->message);
         g_error_free(error);
@@ -113,7 +119,24 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz) {
     g_signal_connect(bus, "message", G_CALLBACK(on_bus_message), nullptr);
     gst_object_unref(bus);
 
-    LOGD("Network Pipeline created successfully with OpenH264.");
+    LOGD("Network Pipeline created successfully.");
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_fingerdraw_SettingsActivity_nativeVerifyCodec(JNIEnv* env, jobject thiz, jstring decoderName) {
+    if (!gst_is_initialized()) {
+        return JNI_FALSE;
+    }
+    
+    const char *decoder_str = env->GetStringUTFChars(decoderName, 0);
+    GstElementFactory *factory = gst_element_factory_find(decoder_str);
+    env->ReleaseStringUTFChars(decoderName, decoder_str);
+
+    if (factory) {
+        gst_object_unref(factory);
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL

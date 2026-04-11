@@ -16,6 +16,12 @@ from socketio import ASGIApp, AsyncServer
 import evdev
 from evdev import UInput, ecodes as e, AbsInfo
 
+parser = argparse.ArgumentParser(description="FingerDraw Linux Server")
+parser.add_argument("--api-port", type=int, default=8000, help="Socket.IO/API Port (default: 8000)")
+parser.add_argument("--udp-input-port", type=int, default=9999, help="UDP Input Port (default: 9999)")
+parser.add_argument("--video-port", type=int, default=5000, help="UDP Video Stream Port (default: 5000)")
+args = parser.parse_args()
+
 # Core initialization
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 Gst.init(None)
@@ -26,7 +32,9 @@ SCREEN_HEIGHT = 1080
 keyboard = KeyboardController()
 ui = None # Initialized in main
 is_pressed = False
-UDP_INPUT_PORT = 9999
+UDP_INPUT_PORT = args.udp_input_port
+API_PORT = args.api_port
+VIDEO_PORT = args.video_port
 detected_android_ip = None
 
 # --- Socket.IO Setup ---
@@ -35,7 +43,7 @@ fastapi_app = FastAPI()
 app = ASGIApp(sio, fastapi_app)
 
 class FingerDrawServer:
-    def __init__(self, target_ip=None, port=5000):
+    def __init__(self, target_ip=None, port=VIDEO_PORT):
         self.bus = dbus.SessionBus()
         self.target_ip = target_ip
         self.port = port
@@ -235,7 +243,7 @@ async def disconnect(sid):
     fd_server.stop()
 
 def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
 
 if __name__ == "__main__":
     capabilities = {
@@ -263,8 +271,9 @@ if __name__ == "__main__":
     api_thread.start()
 
     print(f"--- FingerDraw Server v2.1 ---")
-    print(f"Waiting for Android connection on port 8000...")
+    print(f"Waiting for Android connection on port {API_PORT}...")
     print(f"UDP Input Port: {UDP_INPUT_PORT}")
+    print(f"UDP Video Port: {VIDEO_PORT}")
     print(f"---------------------------------------------")
 
     # Main thread keeps running to allow KeyboardInterrupt

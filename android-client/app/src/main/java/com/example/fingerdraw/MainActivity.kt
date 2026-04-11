@@ -34,7 +34,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var mSocket: Socket? = null
     private var serverUrl = "" 
     private var serverIpOnly = ""
-    private val udpPort = 9999
+    private var udpPort = 9999
+    private var videoPort = 5000
+    private var decoderElement = "openh264dec"
     
     // UDP Input
     private val executor = Executors.newSingleThreadExecutor()
@@ -58,7 +60,14 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             return
         }
         serverIpOnly = ip
-        serverUrl = "http://$ip:8000"
+
+        val prefs = getSharedPreferences("FingerDrawPrefs", MODE_PRIVATE)
+        val apiPort = prefs.getInt("api_port", 8000)
+        udpPort = prefs.getInt("input_port", 9999)
+        videoPort = prefs.getInt("video_port", 5000)
+        decoderElement = prefs.getString("decoder", "openh264dec") ?: "openh264dec"
+
+        serverUrl = "http://$ip:$apiPort"
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -81,7 +90,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             org.freedesktop.gstreamer.GStreamer.init(this)
             isGStreamerInitialized = true
             Log.d("FingerDraw", "GStreamer initialized")
-            nativeInit()
+            nativeInit(videoPort, decoderElement)
         } catch (e: Exception) {
             Log.e("FingerDraw", "GStreamer init failed", e)
         }
@@ -251,8 +260,9 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
         })
 
-        binding.touchOverlay.setOnTouchListener { _, event ->
+        binding.touchOverlay.setOnTouchListener { v, event ->
             if (isPenMode) {
+                v.requestUnbufferedDispatch(event)
                 handlePenTouch(event)
             } else {
                 scaleDetector.onTouchEvent(event)
@@ -279,18 +289,28 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         
         if (w <= 0 || h <= 0) return
 
-        // Inverse transform to find coordinates on the original unscaled video
-        val xInitial = (event.x - translateX - w / 2f) / scaleFactor + w / 2f
-        val yInitial = (event.y - translateY - h / 2f) / scaleFactor + h / 2f
+        val historySize = event.historySize
+        for (i in 0 until historySize) {
+            val hx = event.getHistoricalX(i)
+            val hy = event.getHistoricalY(i)
+            val hp = event.getHistoricalPressure(i)
+            sendHistoricalPoint(hx, hy, hp, w, h, MotionEvent.ACTION_MOVE)
+        }
+
+        sendHistoricalPoint(event.x, event.y, event.pressure, w, h, event.action)
+    }
+
+    private fun sendHistoricalPoint(x: Float, y: Float, pressure: Float, w: Float, h: Float, action: Int) {
+        val xInitial = (x - translateX - w / 2f) / scaleFactor + w / 2f
+        val yInitial = (y - translateY - h / 2f) / scaleFactor + h / 2f
         
         val xNorm = xInitial / w
         val yNorm = yInitial / h
-        val pressure = event.pressure
 
         val finalX = max(0f, min(xNorm, 1f))
         val finalY = max(0f, min(yNorm, 1f))
 
-        when (event.action) {
+        when (action) {
             MotionEvent.ACTION_DOWN -> sendUdp("D:$finalX,$finalY,$pressure")
             MotionEvent.ACTION_MOVE -> sendUdp("M:$finalX,$finalY,$pressure")
             MotionEvent.ACTION_UP -> sendUdp("U")
@@ -352,7 +372,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
-    private external fun nativeInit()
+    private external fun nativeInit(port: Int, decoder: String)
     private external fun nativeFinalize()
     private external fun nativePlay()
     private external fun nativePause()
