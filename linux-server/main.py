@@ -245,6 +245,16 @@ async def disconnect(sid):
 def run_api():
     uvicorn.run(app, host="0.0.0.0", port=API_PORT)
 
+import subprocess
+
+def get_local_ips():
+    try:
+        output = subprocess.check_output(['hostname', '-I']).decode('utf-8').strip()
+        ips = [ip for ip in output.split() if not ip.startswith('127.')]
+        return ips
+    except Exception:
+        return []
+
 if __name__ == "__main__":
     capabilities = {
         e.EV_KEY: [e.BTN_TOUCH],
@@ -271,6 +281,11 @@ if __name__ == "__main__":
     api_thread.start()
 
     print(f"--- FingerDraw Server v2.1 ---")
+    local_ips = get_local_ips()
+    if local_ips:
+        print(f"Available IP Addresses: {', '.join(local_ips)}")
+    else:
+        print("Could not determine local IP addresses.")
     print(f"Waiting for Android connection on port {API_PORT}...")
     print(f"UDP Input Port: {UDP_INPUT_PORT}")
     print(f"UDP Video Port: {VIDEO_PORT}")

@@ -39,10 +39,10 @@ std::string pipe_str =
     "d3d11screencapturesrc ! "
     "queue leaky=downstream max-size-buffers=1 ! "
     "d3d11convert ! "
-    "video/x-raw(memory:D3D11Memory),width=1280,height=720,framerate=60/1 ! "
+    "video/x-raw(memory:D3D11Memory),width=1280,height=720,framerate=40/1 ! "
     "d3d11download ! "
     "video/x-raw,format=I420 ! "
-    "x264enc bitrate=3000 tune=zerolatency speed-preset=ultrafast ! "
+    "x264enc bitrate=1500 tune=zerolatency speed-preset=ultrafast ! "
     "rtph264pay config-interval=1 ! "
     "udpsink host=" + std::string(target_ip) + " port=5000 sync=false";
 
@@ -57,6 +57,25 @@ std::string pipe_str =
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
     std::cout << "[STREAM] Pipeline live to " << target_ip << ":5000" << std::endl;
+}
+
+void print_local_ips() {
+    char hostname[256];
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        struct addrinfo hints = {0}, *res, *p;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
+            std::cout << "[SYSTEM] Available IP Addresses:" << std::endl;
+            for (p = res; p != NULL; p = p->ai_next) {
+                struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+                char ipstr[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &(ipv4->sin_addr), ipstr, INET_ADDRSTRLEN);
+                std::cout << "         " << ipstr << std::endl;
+            }
+            freeaddrinfo(res);
+        }
+    }
 }
 
 void launch_worker() {
@@ -92,6 +111,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "[NET] Winsock init failed." << std::endl;
         return 1;
     }
+
+    print_local_ips();
 
     SOCKET server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     sockaddr_in server_addr;

@@ -69,6 +69,26 @@ int main() {
         float x, y, p;
         char cmd = msg[0];
 
+        if (msg.substr(0, 4) == "ALT:") {
+            int state = msg[4] - '0';
+            if (state == 1) {
+                keybd_event(VK_MENU, 0, 0, 0); // ALT down
+            } else {
+                keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, 0); // ALT up
+            }
+            continue;
+        }
+        else if (msg == "META") {
+            keybd_event(VK_LWIN, 0, 0, 0);
+            keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0);
+            continue;
+        }
+        else if (msg == "TAB") {
+            keybd_event(VK_TAB, 0, 0, 0);
+            keybd_event(VK_TAB, 0, KEYEVENTF_KEYUP, 0);
+            continue;
+        }
+
         // Parse coordinates
         if (sscanf_s(msg.c_str() + 2, "%f,%f,%f", &x, &y, &p) != 3) {
             if (cmd != 'U') continue; 
