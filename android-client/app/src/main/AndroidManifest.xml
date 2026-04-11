@@ -12,6 +12,7 @@
         android:label="FingerDraw"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
         
         <activity
