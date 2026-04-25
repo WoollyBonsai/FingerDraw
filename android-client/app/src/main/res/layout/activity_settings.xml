@@ -70,7 +70,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Decoder Element (e.g. openh264dec, amcvideodec-omxqcomvideodecoderavc)"
+        android:text="Decoder Element"
         android:textColor="#AAAAAA"
         android:layout_marginBottom="8dp"/>
     <EditText
@@ -81,7 +81,32 @@
         android:padding="12dp"
         android:textColor="#FFFFFF"
         android:inputType="text"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="8dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="16dp">
+        <Button
+            android:id="@+id/btnSetOpenH264"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="openh264dec"
+            android:textSize="12sp"
+            style="?android:attr/borderlessButtonStyle"
+            android:textColor="#4CAF50"/>
+        <Button
+            android:id="@+id/btnSetPlaybin"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="playbin (auto)"
+            android:textSize="12sp"
+            style="?android:attr/borderlessButtonStyle"
+            android:textColor="#2196F3"/>
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnVerifyCodec"

@@ -8,6 +8,7 @@
 
 #define TAG "FingerDrawNative"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
 static GstElement *pipeline = nullptr;
@@ -77,16 +78,76 @@ Java_org_freedesktop_gstreamer_GStreamer_nativeInit(JNIEnv* env, jclass clazz, j
     GST_PLUGIN_STATIC_REGISTER(playback);
     GST_PLUGIN_STATIC_REGISTER(openh264);
 
+    // Call androidmedia init explicitly if possible
+    // Note: In some GStreamer versions, this is handled via JNI_OnLoad or automatically.
+    // For static linking, ensuring the plugin is registered is the primary step.
+
     // DEBUG: List ALL available elements to verify registration
     GList *features = gst_registry_get_feature_list(gst_registry_get(), GST_TYPE_ELEMENT_FACTORY);
     LOGD("--- Registered GStreamer Elements ---");
     for (GList *l = features; l != nullptr; l = l->next) {
         GstPluginFeature *f = (GstPluginFeature *)l->data;
-        LOGD("Element: %s", gst_plugin_feature_get_name(f));
+        const gchar* name = gst_plugin_feature_get_name(f);
+        LOGD("Element: %s", name);
     }
     gst_plugin_feature_list_free(features);
 
     pthread_create(&gst_thread, nullptr, gst_worker_thread, nullptr);
+}
+
+static void on_pad_added(GstElement *element, GstPad *pad, gpointer data) {
+    GstElement *videoconvert = (GstElement *)data;
+    GstPad *sinkpad = gst_element_get_static_pad(videoconvert, "sink");
+
+    if (!sinkpad) {
+        LOGE("Could not get sink pad from videoconvert");
+        return;
+    }
+
+    if (gst_pad_is_linked(sinkpad)) {
+        LOGD("Sink pad is already linked, ignoring new pad");
+        gst_object_unref(sinkpad);
+        return;
+    }
+
+    GstCaps *caps = gst_pad_query_caps(pad, NULL);
+    if (!caps) {
+        LOGW("Could not query caps from pad");
+        gst_object_unref(sinkpad);
+        return;
+    }
+
+    GstStructure *str = gst_caps_get_structure(caps, 0);
+    if (!str) {
+        LOGW("Caps have no structure");
+        gst_caps_unref(caps);
+        gst_object_unref(sinkpad);
+        return;
+    }
+
+    const gchar *name = gst_structure_get_name(str);
+    LOGD("decodebin added pad with caps: %s", name ? name : "NULL");
+
+    if (name && g_str_has_prefix(name, "video/x-raw")) {
+        GstElement *parent = GST_ELEMENT(gst_pad_get_parent(pad));
+        gchar *parent_name = gst_element_get_name(parent);
+        LOGD("decodebin selected decoder: %s", parent_name ? parent_name : "UNKNOWN");
+        
+        GstPadLinkReturn ret = gst_pad_link(pad, sinkpad);
+        if (ret != GST_PAD_LINK_OK) {
+            LOGE("Failed to link decoder %s to videoconvert: %d", parent_name, ret);
+        } else {
+            LOGD("Successfully linked %s to videoconvert.", parent_name);
+        }
+        
+        g_free(parent_name);
+        gst_object_unref(parent);
+    } else {
+        LOGD("Ignoring non-raw-video pad: %s", name ? name : "NULL");
+    }
+
+    gst_caps_unref(caps);
+    gst_object_unref(sinkpad);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -94,17 +155,43 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz, j
     GError *error = nullptr;
 
     const char *decoder_str = env->GetStringUTFChars(decoderName, 0);
+    LOGD("Initializing pipeline with decoder: %s", decoder_str);
 
-    char pipeline_str[512];
-    snprintf(pipeline_str, sizeof(pipeline_str),
-        "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
-        "rtpjitterbuffer latency=200 ! "
-        "rtph264depay ! h264parse ! "
-        "%s ! videoconvert ! "
-        "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
-        port, decoder_str);
+    char pipeline_str[1024];
+    if (strcmp(decoder_str, "playbin") == 0 || strcmp(decoder_str, "decodebin") == 0) {
+        // Use decodebin for automatic decoding. Note: no '!' after dbin because it's linked dynamically.
+        snprintf(pipeline_str, sizeof(pipeline_str),
+            "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
+            "rtpjitterbuffer latency=200 ! "
+            "rtph264depay ! h264parse ! "
+            "decodebin name=dbin videoconvert name=conv ! "
+            "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
+            port);
+    } else {
+        // Use specific decoder element
+        snprintf(pipeline_str, sizeof(pipeline_str),
+            "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
+            "rtpjitterbuffer latency=200 ! "
+            "rtph264depay ! h264parse ! "
+            "%s ! videoconvert ! "
+            "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
+            port, decoder_str);
+    }
 
     pipeline = gst_parse_launch(pipeline_str, &error);
+
+    if (pipeline && (strcmp(decoder_str, "playbin") == 0 || strcmp(decoder_str, "decodebin") == 0)) {
+        GstElement *dbin = gst_bin_get_by_name(GST_BIN(pipeline), "dbin");
+        GstElement *conv = gst_bin_get_by_name(GST_BIN(pipeline), "conv");
+        if (dbin && conv) {
+            LOGD("Connecting pad-added signal to decodebin");
+            g_signal_connect(dbin, "pad-added", G_CALLBACK(on_pad_added), conv);
+            gst_object_unref(dbin);
+            gst_object_unref(conv);
+        } else {
+            LOGE("Failed to find dbin or conv elements in pipeline");
+        }
+    }
     
     env->ReleaseStringUTFChars(decoderName, decoder_str);
 

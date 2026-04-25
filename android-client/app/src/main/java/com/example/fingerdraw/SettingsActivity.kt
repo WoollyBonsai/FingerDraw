@@ -28,6 +28,14 @@ class SettingsActivity : AppCompatActivity() {
         binding.etInputPort.setText(prefs.getInt("input_port", 9999).toString())
         binding.etDecoder.setText(prefs.getString("decoder", "openh264dec"))
 
+        binding.btnSetOpenH264.setOnClickListener {
+            binding.etDecoder.setText("openh264dec")
+        }
+
+        binding.btnSetPlaybin.setOnClickListener {
+            binding.etDecoder.setText("playbin")
+        }
+
         binding.btnVerifyCodec.setOnClickListener {
             val decoderName = binding.etDecoder.text.toString().trim()
             if (decoderName.isEmpty()) {

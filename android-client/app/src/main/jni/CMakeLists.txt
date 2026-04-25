@@ -71,6 +71,7 @@ target_link_libraries(fingerdraw-native
     ${GST_DIR}/lib/libjpeg.a
     ${GST_DIR}/lib/libpng16.a
     ${GST_DIR}/lib/libopenh264.a # External lib for openh264 plugin
+    ${GST_DIR}/lib/libz.a
     z
     m
 )
