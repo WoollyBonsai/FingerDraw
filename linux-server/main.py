@@ -36,6 +36,7 @@ UDP_INPUT_PORT = args.udp_input_port
 API_PORT = args.api_port
 VIDEO_PORT = args.video_port
 detected_android_ip = None
+ENCODER_CHOICE = 'vaapi'
 
 STREAM_WIDTH = 1280
 STREAM_HEIGHT = 720
@@ -87,6 +88,15 @@ class FingerDrawServer:
             self.pipeline.set_state(Gst.State.NULL)
             self.pipeline = None
             print("--- STREAM STOPPED ---")
+        if hasattr(self, 'session_handle') and self.session_handle:
+            try:
+                session_proxy = self.bus.get_object("org.freedesktop.portal.Desktop", self.session_handle)
+                session_iface = dbus.Interface(session_proxy, "org.freedesktop.portal.Session")
+                session_iface.Close()
+                print("Closed ScreenCast session.")
+                self.session_handle = None
+            except Exception as e:
+                print(f"Failed to close ScreenCast session: {e}")
         if self.loop:
             self.loop.quit()
             self.loop = None
@@ -123,24 +133,32 @@ class FingerDrawServer:
         self.launch_pipeline(fd, node_id)
 
     def launch_pipeline(self, fd, node_id):
-        global STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE
-        # Optimized for YouTube-like quality with low latency
-        # target-usage=1 ensures maximum encoding quality, vbr prevents blockiness
+        global STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE, ENCODER_CHOICE
         
         if STREAM_WIDTH and STREAM_HEIGHT:
             scale_caps = f"videoscale !\n            video/x-raw,width={STREAM_WIDTH},height={STREAM_HEIGHT},framerate=60/1,format=I420"
         else:
             scale_caps = "video/x-raw,framerate=60/1,format=I420"
 
+        if ENCODER_CHOICE == 'nvenc':
+            encoder_str = f"nvh264enc bitrate={STREAM_BITRATE} preset=low-latency-hq rc-mode=cbr"
+            format_cap = "video/x-raw,format=NV12"
+        elif ENCODER_CHOICE == 'x264':
+            encoder_str = f"x264enc bitrate={STREAM_BITRATE} tune=zerolatency speed-preset=ultrafast key-int-max=30"
+            format_cap = "video/x-raw,format=I420"
+        else:
+            encoder_str = f"vah264enc bitrate={STREAM_BITRATE} rate-control=cbr key-int-max=30 target-usage=1"
+            format_cap = "video/x-raw,format=NV12"
+
         pipeline_str = f"""
             pipewiresrc fd={fd} path={node_id} do-timestamp=true !
-            queue leaky=downstream max-size-buffers=1 !
+            queue max-size-buffers=3 !
             videoconvert !
             videorate !
             {scale_caps} !
             videoconvert !
-            video/x-raw,format=NV12 !
-            vah264enc bitrate={STREAM_BITRATE} rate-control=vbr target-usage=1 ! 
+            {format_cap} !
+            {encoder_str} ! 
             rtph264pay config-interval=1 !
             udpsink host={self.target_ip} port={self.port} sync=false
         """
@@ -285,6 +303,23 @@ if __name__ == "__main__":
         STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = None, None, 25000
     else:
         STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE = 1280, 720, 8000
+
+    print("\n--- Encoder Selection ---")
+    print("1. Intel/AMD Hardware (VA-API)")
+    print("2. NVIDIA Hardware (NVENC)")
+    print("3. CPU Software (x264 - fallback)")
+    try:
+        enc_choice = input("Select encoder (1-3) [default: 1]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        enc_choice = '1'
+        print()
+        
+    if enc_choice == '2':
+        ENCODER_CHOICE = 'nvenc'
+    elif enc_choice == '3':
+        ENCODER_CHOICE = 'x264'
+    else:
+        ENCODER_CHOICE = 'vaapi'
 
     capabilities = {
         e.EV_KEY: [e.BTN_TOUCH],

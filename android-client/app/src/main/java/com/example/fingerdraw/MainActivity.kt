@@ -36,7 +36,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var serverIpOnly = ""
     private var udpPort = 9999
     private var videoPort = 5000
-    private var decoderElement = "openh264dec"
+    private var decoderElement = "decodebin"
     
     // UDP Input
     private val executor = Executors.newSingleThreadExecutor()
@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val apiPort = prefs.getInt("api_port", 8000)
         udpPort = prefs.getInt("input_port", 9999)
         videoPort = prefs.getInt("video_port", 5000)
-        decoderElement = prefs.getString("decoder", "openh264dec") ?: "openh264dec"
+        decoderElement = prefs.getString("decoder", "decodebin") ?: "decodebin"
 
         serverUrl = "http://$ip:$apiPort"
 

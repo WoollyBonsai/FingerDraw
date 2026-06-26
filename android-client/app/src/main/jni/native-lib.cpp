@@ -61,9 +61,22 @@ extern "C" {
     GST_PLUGIN_STATIC_DECLARE(playback);
     GST_PLUGIN_STATIC_DECLARE(openh264);
 }
+extern "C" {
+    void gst_amc_jni_set_java_vm(JavaVM *java_vm);
+}
+
+static JavaVM *g_java_vm = nullptr;
+
+JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
+    g_java_vm = vm;
+    return JNI_VERSION_1_4;
+}
 
 extern "C" JNIEXPORT void JNICALL
 Java_org_freedesktop_gstreamer_GStreamer_nativeInit(JNIEnv* env, jclass clazz, jobject context) {
+    if (g_java_vm) {
+        gst_amc_jni_set_java_vm(g_java_vm);
+    }
     gst_init(nullptr, nullptr);
     
     GST_PLUGIN_STATIC_REGISTER(coreelements);
@@ -162,7 +175,7 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz, j
         // Use decodebin for automatic decoding. Note: no '!' after dbin because it's linked dynamically.
         snprintf(pipeline_str, sizeof(pipeline_str),
             "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
-            "rtpjitterbuffer latency=200 ! "
+            "rtpjitterbuffer latency=0 drop-on-latency=true ! "
             "rtph264depay ! h264parse ! "
             "decodebin name=dbin videoconvert name=conv ! "
             "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
@@ -171,7 +184,7 @@ Java_com_example_fingerdraw_MainActivity_nativeInit(JNIEnv* env, jobject thiz, j
         // Use specific decoder element
         snprintf(pipeline_str, sizeof(pipeline_str),
             "udpsrc port=%d buffer-size=2097152 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,payload=96\" ! "
-            "rtpjitterbuffer latency=200 ! "
+            "rtpjitterbuffer latency=0 drop-on-latency=true ! "
             "rtph264depay ! h264parse ! "
             "%s ! videoconvert ! "
             "glimagesink name=sink sync=false async=false force-aspect-ratio=false",
