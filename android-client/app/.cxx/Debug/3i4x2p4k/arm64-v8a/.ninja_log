@@ -1,13 +1,2 @@
 # ninja log v5
-464	643	1774698980344102689	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	b60e7944b92483b1
-4	464	1774698980176103630	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-3	446	1774699085299818563	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-447	738	1774699085577824707	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	992c053b9ac5bff2
-20	1022	1774875016510580589	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-1022	1883	1774875017360594932	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	992c053b9ac5bff2
-3	471	1774887885577037105	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-471	665	1774887885761037747	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	992c053b9ac5bff2
-3	935	1775890195487931014	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-935	1586	1775890196127934596	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	992c053b9ac5bff2
-3	582	1775891489791174342	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	1f4ce62ab3e7f64e
-582	781	1775891489979175394	/home/woolly/Work/FingerDraw/android-client/app/build/intermediates/cxx/Debug/3i4x2p4k/obj/arm64-v8a/libfingerdraw-native.so	992c053b9ac5bff2
+0	664	1777121739433933719	CMakeFiles/fingerdraw-native.dir/native-lib.cpp.o	b959280e29616e1d

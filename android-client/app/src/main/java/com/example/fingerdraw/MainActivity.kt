@@ -51,6 +51,10 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var scaleDetector: ScaleGestureDetector
     private lateinit var gestureDetector: GestureDetector
 
+    private var swipeStartX = 0f
+    private var swipeStartY = 0f
+    private var isFourFingerSwiping = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -250,7 +254,7 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-                if (!isPenMode && scaleFactor > 1.0f) {
+                if (!isPenMode || e2.pointerCount >= 2) {
                     translateX -= distanceX
                     translateY -= distanceY
                     applyTransform()
@@ -261,7 +265,12 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         })
 
         binding.touchOverlay.setOnTouchListener { v, event ->
-            if (isPenMode) {
+            if (event.pointerCount == 4) {
+                handleFourFingerSwipe(event)
+                return@setOnTouchListener true
+            }
+
+            if (isPenMode && event.pointerCount == 1) {
                 v.requestUnbufferedDispatch(event)
                 handlePenTouch(event)
             } else {
@@ -283,7 +292,52 @@ class MainActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
+    private fun handleFourFingerSwipe(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (event.pointerCount == 4) {
+                    swipeStartX = event.x
+                    swipeStartY = event.y
+                    isFourFingerSwiping = true
+                }
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (isFourFingerSwiping && event.pointerCount == 4) {
+                    val dx = event.x - swipeStartX
+                    val dy = event.y - swipeStartY
+                    if (Math.abs(dx) > 300) {
+                        if (dx > 0) {
+                            sendUdp("SWIPE4:RIGHT")
+                        } else {
+                            sendUdp("SWIPE4:LEFT")
+                        }
+                        isFourFingerSwiping = false
+                    } else if (Math.abs(dy) > 300) {
+                        if (dy > 0) {
+                            sendUdp("SWIPE4:DOWN")
+                        } else {
+                            sendUdp("SWIPE4:UP")
+                        }
+                        isFourFingerSwiping = false
+                    }
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                if (event.pointerCount <= 4) {
+                    isFourFingerSwiping = false
+                }
+            }
+        }
+    }
+
     private fun handlePenTouch(event: MotionEvent) {
+        val trailView = binding.touchOverlay as TrailView
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            trailView.actionUp()
+        } else {
+            trailView.addPoint(event.x, event.y)
+        }
+
         val w = binding.touchOverlay.width.toFloat()
         val h = binding.touchOverlay.height.toFloat()
         

@@ -1,0 +1,4 @@
+1. Android SDK (Platform Tools, Build Tools, NDK, CMake)
+2. GStreamer Android Binaries
+3. Linux Server GStreamer packages
+4. Python dependencies

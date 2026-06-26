@@ -224,6 +224,18 @@ def run_udp_input_listener():
                 keyboard.tap(Key.cmd)
             elif cmd == 'TAB':
                 keyboard.tap(Key.tab)
+            elif cmd == 'SWIPE4':
+                direction = parts[1]
+                if direction == 'LEFT':
+                    keyboard.press(Key.cmd)
+                    keyboard.tap(Key.page_down)
+                    keyboard.release(Key.cmd)
+                elif direction == 'RIGHT':
+                    keyboard.press(Key.cmd)
+                    keyboard.tap(Key.page_up)
+                    keyboard.release(Key.cmd)
+                elif direction == 'UP' or direction == 'DOWN':
+                    keyboard.tap(Key.cmd)
             else:
                 # Debug message
                 pass

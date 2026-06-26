@@ -1,9 +1,9 @@
-set(CMAKE_HOST_SYSTEM "Linux-6.18.5-200.fc43.x86_64")
+set(CMAKE_HOST_SYSTEM "Linux-6.19.13-200.fc43.x86_64")
 set(CMAKE_HOST_SYSTEM_NAME "Linux")
-set(CMAKE_HOST_SYSTEM_VERSION "6.18.5-200.fc43.x86_64")
+set(CMAKE_HOST_SYSTEM_VERSION "6.19.13-200.fc43.x86_64")
 set(CMAKE_HOST_SYSTEM_PROCESSOR "x86_64")
 
-include("/home/woolly/Development/SDK/ndk/26.1.10909125/build/cmake/android.toolchain.cmake")
+include("/home/woolly/Development/android-sdk/ndk/26.1.10909125/build/cmake/android.toolchain.cmake")
 
 set(CMAKE_SYSTEM "Android-1")
 set(CMAKE_SYSTEM_NAME "Android")

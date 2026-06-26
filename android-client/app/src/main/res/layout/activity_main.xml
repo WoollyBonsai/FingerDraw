@@ -132,7 +132,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
             
-        <View
+        <com.example.fingerdraw.TrailView
             android:id="@+id/touchOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
