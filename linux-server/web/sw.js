@@ -1,4 +1,4 @@
-const CACHE_NAME = 'notebook-vault-v9';
+const CACHE_NAME = 'notebook-vault-v10';
 const ASSETS_TO_CACHE = [
   '/',
   '/static/index.html',

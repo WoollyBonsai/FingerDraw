@@ -556,6 +556,7 @@ function redrawCanvas() {
     }
     if (currentInkStroke) {
         drawStroke(inkCtx, currentInkStroke);
+    }
     for (const s of Object.values(liveStrokes)) {
         drawStroke(inkCtx, s);
     }
