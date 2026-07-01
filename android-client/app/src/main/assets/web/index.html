@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="/static/icon.png">
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <title>FingerDraw</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
+</head>
+<body>
+    <div id="welcomeScreen">
+        <div class="top-nav">
+            <img src="/static/icon.png" alt="FingerDraw Icon" class="logo">
+            <span class="brand">FingerDraw</span>
+        </div>
+        
+        <div class="center-content">
+            <h1>Low Latency Virtual Graphic Tablet.</h1>
+            <div style="display: flex; gap: 20px;">
+                <button id="btnStartStream">Screencast</button>
+                <button id="btnStartNotebook">Notebook</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Made by Woolly</p>
+        </div>
+    </div>
+
+    <div id="appScreen" style="display: none;">
+        <div id="toolbar">
+            <div class="tools-left">
+                <button id="btnPointer" class="active">Pointer</button>
+                <button id="btnPen">Pen</button>
+            </div>
+            <div class="tools-center">
+                <button id="btnAlt">ALT</button>
+                <button id="btnMeta">META</button>
+                <button id="btnTab">TAB</button>
+                <button id="btnFullscreen">Fullscreen</button>
+            </div>
+            <div class="tools-right">
+                <button id="btnDisconnect" class="danger">Disconnect</button>
+            </div>
+        </div>
+        <div id="canvas-container">
+            <div id="canvas-wrapper">
+                <video id="player" autoplay muted playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="notebookDashboardScreen" style="display: none; width: 100%; height: 100%; flex-direction: column; background: #f0f2f5; align-items: center; overflow-y: auto;">
+        <div style="width: 100%; max-width: 800px; padding: 40px 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h1 style="color: #333; margin: 0;">Notebooks</h1>
+                <button id="btnDashboardBack" class="danger-btn" style="padding: 8px 16px;">Back Home</button>
+            </div>
+            
+            <button id="btnDashboardNew" class="primary-btn" style="width: 100%; padding: 15px; font-size: 1.1em; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">+ Create New Notebook</button>
+            
+            <div id="dashboardGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+                <!-- Note Cards injected here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="notebookScreen" style="display: none; width: 100%; height: 100%; flex-direction: row; background: #fafafa;">
+        <div id="sidebarOverlay" class="sidebar-overlay"></div>
+        <div id="notebookSidebar" class="sidebar-hidden">
+            <div class="sidebar-header">
+                <h2>Notebooks</h2>
+                <button id="btnNewNote" class="primary-btn">+ New</button>
+            </div>
+            <ul id="noteList"></ul>
+            <div class="sidebar-footer">
+                <button id="btnNotebookDisconnect" class="danger-btn" style="width: 100%;">Back to Menu</button>
+            </div>
+        </div>
+        <div id="notebookEditor" class="notebook-editor-container">
+            <div class="notebook-toolbar">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button id="btnNotebookExit" class="tool-btn" style="color: #e74c3c; font-weight: bold;" title="Exit Notebook">↩️ Exit</button>
+                    <button id="btnToggleSidebar" class="tool-btn">☰</button>
+                    <input type="text" id="noteTitle" placeholder="Untitled Note..." autocomplete="off">
+                    <label style="display: flex; align-items: center; gap: 4px; font-size: 14px; color: #555;">
+                        <input type="checkbox" id="ocrToggle"> Enable OCR
+                    </label>
+                </div>
+                <div class="toolbar-actions">
+                    <div class="tool-group">
+                        <button class="tool-btn active" id="toolPen" title="Pen">✏️</button>
+                        <button class="tool-btn" id="toolEraser" title="Eraser">🗑️</button>
+                    </div>
+                    <div class="tool-group color-picker" id="colorPicker">
+                        <div class="color-swatch active" style="background: #000000;" data-color="#000000"></div>
+                        <div class="color-swatch" style="background: #e74c3c;" data-color="#e74c3c"></div>
+                        <div class="color-swatch" style="background: #3498db;" data-color="#3498db"></div>
+                        <div class="color-swatch" style="background: #2ecc71;" data-color="#2ecc71"></div>
+                    </div>
+                    <div class="tool-group">
+                        <select id="bgSelect" class="bg-select">
+                            <option value="blank">Blank</option>
+                            <option value="ruled">Ruled</option>
+                            <option value="grid">Grid</option>
+                            <option value="dots">Dots</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="canvas-wrapper-notebook" id="notebookCanvasWrapper">
+                <canvas id="inkCanvas"></canvas>
+                <canvas id="minimapCanvas" style="position: absolute; top: 16px; right: 16px; width: 150px; height: 100px; background: rgba(255, 255, 255, 0.9); border: 2px solid #ccc; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; z-index: 50;"></canvas>
+                <div id="palmBubble" style="display: none; position: absolute; width: 60px; height: 60px; background: rgba(231, 76, 60, 0.4); border: 2px solid #e74c3c; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); transition: opacity 0.3s; z-index: 100;"></div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/perfect-freehand.js"></script>
+    <script src="/static/idb.js"></script>
+    <script src="/static/script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js').then(reg => {
+                    console.log('ServiceWorker registration successful');
+                }).catch(err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

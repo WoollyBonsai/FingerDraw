@@ -22,11 +22,29 @@ class ConnectActivity : AppCompatActivity() {
             val ip = binding.etServerIp.text.toString().trim()
             if (ip.isNotEmpty()) {
                 prefs.edit().putString("server_ip", ip).apply()
-                
-                val intent = Intent(this, MainActivity::class.java)
-                intent.putExtra("SERVER_IP", ip)
-                startActivity(intent)
+
+                val options = arrayOf("Screencast", "Web Notebook")
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Choose Connection Type")
+                    .setItems(options) { _, which ->
+                        if (which == 0) {
+                            val intent = Intent(this, MainActivity::class.java)
+                            intent.putExtra("SERVER_IP", ip)
+                            startActivity(intent)
+                        } else {
+                            val intent = Intent(this, NotebookActivity::class.java)
+                            intent.putExtra("URL", "http://$ip:8000/static/index.html")
+                            startActivity(intent)
+                        }
+                    }
+                    .show()
             }
+        }
+
+        binding.btnLocalNotebook.setOnClickListener {
+            val intent = Intent(this, NotebookActivity::class.java)
+            intent.putExtra("URL", "file:///android_asset/web/index.html")
+            startActivity(intent)
         }
 
         binding.btnSettings.setOnClickListener {
