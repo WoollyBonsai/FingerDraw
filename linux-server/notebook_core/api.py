@@ -23,7 +23,7 @@ def on_startup():
     init_repo()
 
 # Background task worker
-def process_note_background(note: Note, content: str, image_b64: str = None):
+def process_note_background(note: Note, content: str, image_b64: str = None, enable_ocr: bool = False):
     """
     Handles saving the markdown file, committing to git, extracting OCR, and indexing to ChromaDB
     without blocking the API response thread.
@@ -39,7 +39,7 @@ def process_note_background(note: Note, content: str, image_b64: str = None):
         
         # 3. OCR Extraction
         extracted_text = ""
-        if image_b64 and image_b64.startswith("data:image/png;base64,"):
+        if enable_ocr and image_b64 and image_b64.startswith("data:image/png;base64,"):
             b64_data = image_b64.split(",")[1]
             try:
                 img = Image.open(BytesIO(base64.b64decode(b64_data)))
@@ -71,7 +71,7 @@ async def create_note(note_in: NoteCreate, background_tasks: BackgroundTasks, se
     session.refresh(db_note)
     
     # 2. Enqueue background processing for file I/O, Git, and Vector DB
-    background_tasks.add_task(process_note_background, db_note, note_in.content, note_in.image)
+    background_tasks.add_task(process_note_background, db_note, note_in.content, note_in.image, note_in.enable_ocr)
     return NoteRead(**db_note.dict(), content=note_in.content)
 
 @router.put("/notes/{note_id}", response_model=NoteRead)
@@ -86,7 +86,7 @@ async def update_note(note_id: str, note_in: NoteCreate, background_tasks: Backg
     session.commit()
     session.refresh(db_note)
     
-    background_tasks.add_task(process_note_background, db_note, note_in.content, note_in.image)
+    background_tasks.add_task(process_note_background, db_note, note_in.content, note_in.image, note_in.enable_ocr)
     return NoteRead(**db_note.dict(), content=note_in.content)
 
 @router.get("/notes/", response_model=List[NoteRead])

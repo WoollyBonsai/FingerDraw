@@ -16,6 +16,7 @@ class Note(NoteBase, table=True):
 class NoteCreate(NoteBase):
     content: str
     image: Optional[str] = Field(default=None, description="Base64 encoded PNG of the canvas")
+    enable_ocr: bool = Field(default=False, description="Whether to run OCR on the image")
     
 class NoteRead(NoteBase):
     id: str

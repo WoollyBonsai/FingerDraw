@@ -485,10 +485,10 @@ function drawStroke(ctx, strokeObj) {
     if (!getStroke) return;
     
     const outline = getStroke(strokeObj.points, {
-        size: strokeObj.size || 4,
-        thinning: 0.5,
-        smoothing: 0.5,
-        streamline: 0.5,
+        size: strokeObj.size || 8,
+        thinning: 0.6,
+        smoothing: 0.8,
+        streamline: 0.7,
         simulatePressure: true
     });
     
@@ -679,7 +679,7 @@ function handlePointerDown(e) {
             id: Math.random().toString(36).substr(2, 9),
             tool: currentTool,
             color: currentColor,
-            size: 4,
+            size: 8,
             points: [[wc.x, wc.y, sc.pressure]]
         };
         
@@ -1008,7 +1008,8 @@ async function syncNote() {
     
     try {
         const image = document.getElementById('inkCanvas').toDataURL("image/png");
-        const payload = { title, content, tags: "", image };
+        const enable_ocr = document.getElementById('ocrToggle').checked;
+        const payload = { title, content, tags: "", image, enable_ocr };
         let res;
         if (note.isTemp) {
             res = await fetch('/api/notebook/notes/', {
