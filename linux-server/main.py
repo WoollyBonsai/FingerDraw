@@ -15,6 +15,7 @@ from pynput.keyboard import Key, Controller as KeyboardController
 from socketio import ASGIApp, AsyncServer
 import evdev
 from evdev import UInput, ecodes as e, AbsInfo
+import web_server
 
 parser = argparse.ArgumentParser(description="FingerDraw Linux Server")
 parser.add_argument("--api-port", type=int, default=8000, help="Socket.IO/API Port (default: 8000)")
@@ -37,6 +38,7 @@ API_PORT = args.api_port
 VIDEO_PORT = args.video_port
 detected_android_ip = None
 ENCODER_CHOICE = 'vaapi'
+CLIENT_TYPE = 'apk'
 
 STREAM_WIDTH = 1280
 STREAM_HEIGHT = 720
@@ -133,7 +135,7 @@ class FingerDrawServer:
         self.launch_pipeline(fd, node_id)
 
     def launch_pipeline(self, fd, node_id):
-        global STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE, ENCODER_CHOICE
+        global STREAM_WIDTH, STREAM_HEIGHT, STREAM_BITRATE, ENCODER_CHOICE, CLIENT_TYPE
         
         if STREAM_WIDTH and STREAM_HEIGHT:
             scale_caps = f"videoscale !\n            video/x-raw,width={STREAM_WIDTH},height={STREAM_HEIGHT},framerate=60/1,format=I420"
@@ -150,34 +152,118 @@ class FingerDrawServer:
             encoder_str = f"vah264enc bitrate={STREAM_BITRATE} rate-control=cbr key-int-max=30 target-usage=1"
             format_cap = "video/x-raw,format=NV12"
 
-        pipeline_str = f"""
-            pipewiresrc fd={fd} path={node_id} do-timestamp=true !
-            queue max-size-buffers=3 !
-            videoconvert !
-            videorate !
-            {scale_caps} !
-            videoconvert !
-            {format_cap} !
-            {encoder_str} ! 
-            rtph264pay config-interval=1 !
-            udpsink host={self.target_ip} port={self.port} sync=false
-        """
-        
-        print(f"Streaming screen to {self.target_ip}:{self.port} via VA-API...")
+        if CLIENT_TYPE == 'web':
+            pipeline_str = f"""
+                pipewiresrc fd={fd} path={node_id} do-timestamp=true !
+                queue max-size-buffers=3 !
+                videoconvert !
+                videorate !
+                video/x-raw,framerate=60/1 !
+                videoscale !
+                video/x-raw,width={STREAM_WIDTH or 1280},height={STREAM_HEIGHT or 720} !
+                videoconvert !
+                {format_cap} !
+                {encoder_str} ! 
+                h264parse config-interval=1 !
+                video/x-h264,stream-format=byte-stream !
+                appsink name=sink emit-signals=true max-buffers=5 drop=true
+            """
+            print(f"Streaming screen to Web Clients (H.264)...")
+        else:
+            pipeline_str = f"""
+                pipewiresrc fd={fd} path={node_id} do-timestamp=true !
+                queue max-size-buffers=3 !
+                videoconvert !
+                videorate !
+                {scale_caps} !
+                videoconvert !
+                {format_cap} !
+                {encoder_str} ! 
+                rtph264pay config-interval=1 !
+                udpsink host={self.target_ip} port={self.port} sync=false
+            """
+            print(f"Streaming screen to {self.target_ip}:{self.port} via VA-API...")
+            
         try:
             self.pipeline = Gst.parse_launch(pipeline_str)
+            if CLIENT_TYPE == 'web':
+                appsink = self.pipeline.get_by_name("sink")
+                appsink.connect("new-sample", self.on_new_sample)
             self.pipeline.set_state(Gst.State.PLAYING)
             print("--- STREAM ACTIVE ---")
         except Exception as e:
             print(f"Failed to create pipeline: {e}")
             if self.loop: self.loop.quit()
 
+    def on_new_sample(self, sink):
+        sample = sink.emit("pull-sample")
+        if sample:
+            buf = sample.get_buffer()
+            result, mapinfo = buf.map(Gst.MapFlags.READ)
+            if result:
+                web_server.broadcast_jpeg(mapinfo.data[:])
+            buf.unmap(mapinfo)
+        return Gst.FlowReturn.OK
+
 # Global server instance
 fd_server = FingerDrawServer()
 
+# --- Input Handling Logic ---
+def handle_input_command(msg):
+    global is_pressed
+    parts = msg.split(':')
+    if not parts: return
+    
+    cmd = parts[0]
+    if cmd in ['D', 'M']:
+        try:
+            params = parts[1].split(',')
+            x_norm, y_norm, p_norm = float(params[0]), float(params[1]), float(params[2])
+            
+            if not is_pressed:
+                ui.write(e.EV_KEY, e.BTN_TOUCH, 1)
+                is_pressed = True
+            
+            ui.write(e.EV_ABS, e.ABS_X, int(x_norm * SCREEN_WIDTH))
+            ui.write(e.EV_ABS, e.ABS_Y, int(y_norm * SCREEN_HEIGHT))
+            ui.write(e.EV_ABS, e.ABS_PRESSURE, int(p_norm * 255))
+            ui.syn()
+        except: pass
+    elif cmd == 'U':
+        ui.write(e.EV_KEY, e.BTN_TOUCH, 0)
+        ui.syn()
+        is_pressed = False
+    elif cmd == 'ALT':
+        state = int(parts[1])
+        if state == 1:
+            keyboard.press(Key.alt)
+        else:
+            keyboard.release(Key.alt)
+    elif cmd == 'META':
+        keyboard.tap(Key.cmd)
+    elif cmd == 'TAB':
+        keyboard.tap(Key.tab)
+    elif cmd == 'SWIPE4':
+        direction = parts[1]
+        if direction == 'LEFT':
+            keyboard.press(Key.cmd)
+            keyboard.tap(Key.page_down)
+            keyboard.release(Key.cmd)
+        elif direction == 'RIGHT':
+            keyboard.press(Key.cmd)
+            keyboard.tap(Key.page_up)
+            keyboard.release(Key.cmd)
+        elif direction == 'UP' or direction == 'DOWN':
+            keyboard.tap(Key.cmd)
+    else:
+        pass
+
+# Initialize Web Routes
+web_server.setup_web_routes(fastapi_app, sio, handle_input_command)
+
 # --- UDP Input Listener ---
 def run_udp_input_listener():
-    global is_pressed, detected_android_ip
+    global detected_android_ip
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("0.0.0.0", UDP_INPUT_PORT))
     print(f"UDP Input Listener started on port {UDP_INPUT_PORT}")
@@ -185,69 +271,25 @@ def run_udp_input_listener():
     while True:
         try:
             data, addr = sock.recvfrom(1024)
-            
-            # Auto-detect IP from the sender of UDP packets
             if detected_android_ip != addr[0]:
                 detected_android_ip = addr[0]
                 print(f"--- AUTO-DETECTED ANDROID IP: {detected_android_ip} ---")
 
             msg = data.decode('utf-8')
-            parts = msg.split(':')
-            if not parts: continue
-            
-            cmd = parts[0]
-            if cmd in ['D', 'M']:
-                try:
-                    params = parts[1].split(',')
-                    x_norm, y_norm, p_norm = float(params[0]), float(params[1]), float(params[2])
-                    
-                    if not is_pressed:
-                        ui.write(e.EV_KEY, e.BTN_TOUCH, 1)
-                        is_pressed = True
-                    
-                    ui.write(e.EV_ABS, e.ABS_X, int(x_norm * SCREEN_WIDTH))
-                    ui.write(e.EV_ABS, e.ABS_Y, int(y_norm * SCREEN_HEIGHT))
-                    ui.write(e.EV_ABS, e.ABS_PRESSURE, int(p_norm * 255))
-                    ui.syn()
-                except: pass
-            elif cmd == 'U':
-                ui.write(e.EV_KEY, e.BTN_TOUCH, 0)
-                ui.syn()
-                is_pressed = False
-            elif cmd == 'ALT':
-                state = int(parts[1])
-                if state == 1:
-                    keyboard.press(Key.alt)
-                else:
-                    keyboard.release(Key.alt)
-            elif cmd == 'META':
-                keyboard.tap(Key.cmd)
-            elif cmd == 'TAB':
-                keyboard.tap(Key.tab)
-            elif cmd == 'SWIPE4':
-                direction = parts[1]
-                if direction == 'LEFT':
-                    keyboard.press(Key.cmd)
-                    keyboard.tap(Key.page_down)
-                    keyboard.release(Key.cmd)
-                elif direction == 'RIGHT':
-                    keyboard.press(Key.cmd)
-                    keyboard.tap(Key.page_up)
-                    keyboard.release(Key.cmd)
-                elif direction == 'UP' or direction == 'DOWN':
-                    keyboard.tap(Key.cmd)
-            else:
-                # Debug message
-                pass
+            handle_input_command(msg)
         except Exception as ex:
             print(f"UDP Input Error: {ex}")
 
 # --- Socket.IO Event Handlers ---
 @sio.event
 async def connect(sid, environ):
-    global detected_android_ip
+    global detected_android_ip, CLIENT_TYPE
     print(f"Socket.IO Handshake initiated (SID: {sid})")
     
+    if CLIENT_TYPE == 'web':
+        await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
+        return
+
     # Wait up to 3 seconds for the UDP listener to catch a packet if it hasn't yet
     timeout = 30 
     while not detected_android_ip and timeout > 0:
@@ -263,6 +305,12 @@ async def connect(sid, environ):
     
     fd_server.start(target_ip)
     await sio.emit('screen_resolution', {'width': SCREEN_WIDTH, 'height': SCREEN_HEIGHT}, to=sid)
+
+@sio.event
+async def start_web_stream(sid):
+    if CLIENT_TYPE == 'web':
+        print(f"Web Client {sid} requested stream start.")
+        fd_server.start("127.0.0.1")
 
 @sio.event
 async def restart_stream(sid):
@@ -296,11 +344,25 @@ def get_local_ips():
         return []
 
 if __name__ == "__main__":
+    print("\n--- Client Type Selection ---")
+    print("1. Android APK (UDP Direct Stream)")
+    print("2. Web Browser Client")
+    try:
+        client_input = input("Select client (1-2) [default: 1]: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        client_input = '1'
+        print()
+    
+    if client_input == '2':
+        CLIENT_TYPE = 'web'
+    else:
+        CLIENT_TYPE = 'apk'
+
     print("\n--- Stream Quality Selection ---")
-    print("1. 480p (854x480, 4Mbps - High Quality)")
-    print("2. 720p (1280x720, 8Mbps - High Quality)")
-    print("3. 1080p (1920x1080, 16Mbps - High Quality)")
-    print("4. System Resolution (Native, 25Mbps - Max Quality)")
+    print("1. 480p (854x480 - High Quality)")
+    print("2. 720p (1280x720 - High Quality)")
+    print("3. 1080p (1920x1080 - High Quality)")
+    print("4. System Resolution (Native - Max Quality)")
     try:
         choice = input("Select quality (1-4) [default: 2]: ").strip()
     except (EOFError, KeyboardInterrupt):
@@ -363,12 +425,16 @@ if __name__ == "__main__":
         print(f"Available IP Addresses: {', '.join(local_ips)}")
     else:
         print("Could not determine local IP addresses.")
-    print(f"Waiting for Android connection on port {API_PORT}...")
+    print(f"Waiting for connection on port {API_PORT}...")
+    if CLIENT_TYPE == 'web':
+        if local_ips:
+            print(f"==> Open http://{local_ips[0]}:{API_PORT} in your Web Browser <==")
+        else:
+            print(f"==> Open http://localhost:{API_PORT} in your Web Browser <==")
     print(f"UDP Input Port: {UDP_INPUT_PORT}")
     print(f"UDP Video Port: {VIDEO_PORT}")
     print(f"---------------------------------------------")
 
-    # Main thread keeps running to allow KeyboardInterrupt
     try:
         while True:
             time.sleep(1)

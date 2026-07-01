@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="/static/icon.png">
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <title>FingerDraw</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
+</head>
+<body>
+    <div id="welcomeScreen">
+        <div class="top-nav">
+            <img src="/static/icon.png" alt="FingerDraw Icon" class="logo">
+            <span class="brand">FingerDraw</span>
+        </div>
+        
+        <div class="center-content">
+            <h1>Low Latency Virtual Graphic Tablet.</h1>
+            <button id="btnStartStream">Start Stream</button>
+        </div>
+
+        <div class="footer">
+            <p>Made by Woolly</p>
+        </div>
+    </div>
+
+    <div id="appScreen" style="display: none;">
+        <div id="toolbar">
+            <div class="tools-left">
+                <button id="btnPointer" class="active">Pointer</button>
+                <button id="btnPen">Pen</button>
+            </div>
+            <div class="tools-center">
+                <button id="btnAlt">ALT</button>
+                <button id="btnMeta">META</button>
+                <button id="btnTab">TAB</button>
+                <button id="btnFullscreen">Fullscreen</button>
+            </div>
+            <div class="tools-right">
+                <button id="btnDisconnect" class="danger">Disconnect</button>
+            </div>
+        </div>
+        <div id="canvas-container">
+            <div id="canvas-wrapper">
+                <video id="player" autoplay muted playsinline></video>
+                <canvas id="overlayCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+    <script src="/static/script.js"></script>
+</body>
+</html>
