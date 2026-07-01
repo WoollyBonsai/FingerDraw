@@ -328,10 +328,18 @@ async def disconnect_request(sid):
 @sio.event
 async def disconnect(sid):
     print(f"Client disconnected: {sid}")
+    web_server.handle_client_disconnect(sid)
     fd_server.stop()
 
+from notebook_core.network import setup_tls, start_mdns
+
 def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=API_PORT)
+    cert_file, key_file = setup_tls()
+    
+    if cert_file and key_file:
+        uvicorn.run(app, host="0.0.0.0", port=API_PORT, ssl_keyfile=key_file, ssl_certfile=cert_file)
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=API_PORT)
 
 import subprocess
 
@@ -426,11 +434,18 @@ if __name__ == "__main__":
     else:
         print("Could not determine local IP addresses.")
     print(f"Waiting for connection on port {API_PORT}...")
+    
+    try:
+        mdns_service, mdns_info = start_mdns(port=API_PORT)
+    except Exception as e:
+        print(f"Warning: Failed to start mDNS: {e}")
+        mdns_service = None
+        
     if CLIENT_TYPE == 'web':
         if local_ips:
-            print(f"==> Open http://{local_ips[0]}:{API_PORT} in your Web Browser <==")
+            print(f"==> Open https://vault.local:{API_PORT} or https://{local_ips[0]}:{API_PORT} in your Web Browser <==")
         else:
-            print(f"==> Open http://localhost:{API_PORT} in your Web Browser <==")
+            print(f"==> Open https://localhost:{API_PORT} in your Web Browser <==")
     print(f"UDP Input Port: {UDP_INPUT_PORT}")
     print(f"UDP Video Port: {VIDEO_PORT}")
     print(f"---------------------------------------------")
