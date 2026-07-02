@@ -64,12 +64,45 @@
                 <button id="btnDashboardBack" class="danger-btn" style="padding: 8px 16px;">Back Home</button>
             </div>
             
-            <button id="btnDashboardNew" class="primary-btn" style="width: 100%; padding: 15px; font-size: 1.1em; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">+ Create New Notebook</button>
+            <button id="btnDashboardNew" class="primary-btn" style="width: 100%; padding: 15px; font-size: 1.1em; margin-bottom: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">+ Create New Notebook</button>
+            <button id="btnTrainHandwriting" class="secondary-btn" style="width: 100%; padding: 15px; font-size: 1.1em; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); background: #fff; border: 1px solid #ccc; cursor: pointer; color: #333;">✍️ Train Handwriting OCR</button>
             
             <input type="text" id="dashboardSearch" placeholder="🔍 Search notebooks by title or handwriting content (OCR)..." style="width: 100%; padding: 15px; font-size: 1em; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; outline: none;">
             
             <div id="dashboardGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
                 <!-- Note Cards injected here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="trainingScreen" style="display: none; width: 100%; height: 100%; flex-direction: column; background: #f0f2f5; align-items: center; overflow-y: auto;">
+        <div style="width: 100%; max-width: 800px; padding: 40px 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h1 style="color: #333; margin: 0;">Handwriting Training</h1>
+                <button id="btnTrainingBack" class="danger-btn" style="padding: 8px 16px;">Back to Notebooks</button>
+            </div>
+            <p style="color: #666; margin-bottom: 20px;">Draw each character carefully. These samples will be used to calibrate your personal OCR model.</p>
+            
+            <div style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 20px;">
+                <div style="flex: 1; background: #fff; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: center;">
+                    <h2 id="trainingTargetChar" style="font-size: 5em; margin: 0; color: #333; line-height: 1;">A</h2>
+                    <p style="color: #888; margin-top: 10px;">Please draw this character</p>
+                </div>
+                <div style="flex: 2; background: #fff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); position: relative; overflow: hidden; height: 300px;">
+                    <canvas id="trainingCanvas" style="width: 100%; height: 100%; touch-action: none; cursor: crosshair; border: 1px solid #eee;"></canvas>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="btnTrainingClear" class="danger-btn" style="padding: 10px 20px;">Clear</button>
+                <button id="btnTrainingNext" class="primary-btn" style="padding: 10px 20px;">Save & Next</button>
+            </div>
+            
+            <div style="margin-top: 30px;">
+                <h3>Progress (<span id="trainingProgressText">0/62</span>)</h3>
+                <div style="width: 100%; background: #ddd; height: 10px; border-radius: 5px; overflow: hidden;">
+                    <div id="trainingProgressBar" style="width: 0%; background: #3498db; height: 100%; transition: width 0.3s;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -92,8 +125,8 @@
                     <button id="btnNotebookExit" class="tool-btn" style="color: #e74c3c; font-weight: bold;" title="Exit Notebook">↩️ Exit</button>
                     <button id="btnToggleSidebar" class="tool-btn">☰</button>
                     <input type="text" id="noteTitle" placeholder="Untitled Note..." autocomplete="off">
-                    <label style="display: flex; align-items: center; gap: 4px; font-size: 14px; color: #555;">
-                        <input type="checkbox" id="ocrToggle"> Enable OCR
+                    <label style="font-size: 14px; margin-left: 10px; display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="ocrToggle" checked> Enable OCR
                     </label>
                 </div>
                 <div class="toolbar-actions">
@@ -164,6 +197,7 @@
     <script src="/static/perfect-freehand.js"></script>
     <script src="/static/idb.js"></script>
     <script src="/static/script.js"></script>
+    <script src="/static/training.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
