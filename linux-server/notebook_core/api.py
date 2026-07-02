@@ -51,11 +51,12 @@ def process_note_background(note: Note, content: str, image_b64: str = None, ena
                 print(f"OCR Error: {e}")
         
         # 4. Index into Vector Database
-        full_content = content
+        # Do not index raw JSON strokes, it dilutes the text embedding!
+        index_content = f"Title: {note.title}"
         if extracted_text.strip():
-            full_content += f"\n\n[OCR Data]\n{extracted_text}"
+            index_content += f"\n\nOCR Text:\n{extracted_text}"
             
-        index_note(note.id, note.title, full_content)
+        index_note(note.id, note.title, index_content)
         
         print(f"Successfully processed note {note.id} in background.")
     except Exception as e:

@@ -402,3 +402,14 @@ video {
     align-self: flex-start;
     margin-top: 10px;
 }
+
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+  70% { box-shadow: 0 0 10px 10px rgba(231, 76, 60, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+.eraser-active {
+  animation: pulseGlow 1.5s infinite;
+  background: #ffcccc !important;
+}
