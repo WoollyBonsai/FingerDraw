@@ -419,9 +419,19 @@ document.getElementById('btnStartNotebook').onclick = () => {
     loadNotes();
 };
 
+if (isLocalApp) {
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('notebookDashboardScreen').style.display = 'flex';
+    document.getElementById('btnDashboardBack').style.display = 'none'; // Hide back button for local app
+    // Run loadNotes on next tick to ensure IndexedDB is initialized
+    setTimeout(loadNotes, 100);
+}
+
 document.getElementById('btnDashboardBack').onclick = () => {
-    document.getElementById('notebookDashboardScreen').style.display = 'none';
-    document.getElementById('welcomeScreen').style.display = 'flex';
+    if (!isLocalApp) {
+        document.getElementById('notebookDashboardScreen').style.display = 'none';
+        document.getElementById('welcomeScreen').style.display = 'flex';
+    }
 };
 
 document.getElementById('btnNotebookDisconnect').onclick = () => {

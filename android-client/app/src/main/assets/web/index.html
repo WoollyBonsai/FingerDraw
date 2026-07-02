@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" href="/static/icon.png">
-    <link rel="apple-touch-icon" href="/static/icon.png">
-    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
     <title>FingerDraw</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
 </head>
@@ -122,13 +122,13 @@
             </div>
         </div>
     </div>
-    <script src="/static/perfect-freehand.js"></script>
-    <script src="/static/idb.js"></script>
-    <script src="/static/script.js"></script>
+    <script src="perfect-freehand.js"></script>
+    <script src="idb.js"></script>
+    <script src="script.js"></script>
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js').then(reg => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
                     console.log('ServiceWorker registration successful');
                 }).catch(err => {
                     console.log('ServiceWorker registration failed: ', err);
