@@ -370,9 +370,14 @@ window.addEventListener('mouseup', () => {
 
 let dbPromise = null;
 if (window.idb) {
-    dbPromise = idb.openDB('notebook-store', 1, {
-        upgrade(db) {
-            db.createObjectStore('notes', { keyPath: 'id' });
+    dbPromise = idb.openDB('notebook-store', 2, {
+        upgrade(db, oldVersion) {
+            if (!db.objectStoreNames.contains('notes')) {
+                db.createObjectStore('notes', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('training')) {
+                db.createObjectStore('training', { keyPath: 'id' });
+            }
         },
     });
 }

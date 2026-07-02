@@ -19,12 +19,14 @@ if (trainCanvas) {
     window.addEventListener('resize', resizeTrainCanvas);
     
     document.getElementById('btnTrainHandwriting').onclick = () => {
-        showScreen('trainingScreen');
+        document.getElementById('notebookDashboardScreen').style.display = 'none';
+        document.getElementById('trainingScreen').style.display = 'flex';
         setTimeout(resizeTrainCanvas, 100);
         updateTrainingUI();
     };
     document.getElementById('btnTrainingBack').onclick = () => {
-        showScreen('notebookDashboardScreen');
+        document.getElementById('trainingScreen').style.display = 'none';
+        document.getElementById('notebookDashboardScreen').style.display = 'flex';
     };
     
     trainCanvas.onpointerdown = (e) => {
@@ -59,17 +61,21 @@ if (trainCanvas) {
         
         // Save to indexedDB for now, or just pretend for UI
         // We will store it in local db under 'training'
-        await window.db.put('training', { 
-            id: trainingChars[currentTrainIndex], 
-            char: trainingChars[currentTrainIndex], 
-            strokes: trainingStrokes 
-        });
+        if (typeof dbPromise !== 'undefined' && dbPromise) {
+            const db = await dbPromise;
+            await db.put('training', { 
+                id: trainingChars[currentTrainIndex], 
+                char: trainingChars[currentTrainIndex], 
+                strokes: trainingStrokes 
+            });
+        }
         
         trainingStrokes = [];
         currentTrainIndex++;
         if (currentTrainIndex >= trainingChars.length) {
             alert("Training complete! Your custom OCR profile is saved and ready.");
-            showScreen('notebookDashboardScreen');
+            document.getElementById('trainingScreen').style.display = 'none';
+            document.getElementById('notebookDashboardScreen').style.display = 'flex';
             currentTrainIndex = 0;
         } else {
             updateTrainingUI();
