@@ -1,14 +1,5 @@
 const isLocalApp = window.location.protocol === 'file:' || window.location.protocol === 'android-app:';
 
-if (isLocalApp) {
-    // We might need to wait for DOMContentLoaded if script is in <head>, but it's at end of <body>
-    document.getElementById('welcomeScreen').style.display = 'none';
-    document.getElementById('notebookDashboardScreen').style.display = 'flex';
-    if(document.getElementById('btnDashboardBack')) {
-        document.getElementById('btnDashboardBack').style.display = 'none';
-    }
-}
-
 const player = document.getElementById('player');
 const overlayCanvas = document.getElementById('overlayCanvas');
 const overlayCtx = overlayCanvas.getContext('2d');
@@ -194,7 +185,7 @@ drawTrail();
 
 // Touch Handling
 function getNormCoords(clientX, clientY) {
-    const rect = overlayCanvas.getBoundingClientRect();
+    const rect = inkCanvas.getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     return {
@@ -202,6 +193,9 @@ function getNormCoords(clientX, clientY) {
         yNorm: Math.max(0, Math.min(1, y / rect.height))
     };
 }
+
+// Block context menu to fix Android long press
+window.addEventListener('contextmenu', e => e.preventDefault());
 
 let isFourFingerSwiping = false;
 let swipeStartX = 0, swipeStartY = 0;
@@ -258,7 +252,7 @@ overlayCanvas.addEventListener('touchstart', (e) => {
         sio.emit('input_command', `D:${xNorm},${yNorm},${pressure}`);
         
         const rect = overlayCanvas.getBoundingClientRect();
-        const canvasX = (touch.clientX - rect.left) * (overlayCanvas.width / rect.width);
+        const canvasX = (touch.clientX - rect.left) * (inkCanvas.width / rect.width);
         const canvasY = (touch.clientY - rect.top) * (overlayCanvas.height / rect.height);
         
         currentStroke = [{x: canvasX, y: canvasY}];
@@ -319,7 +313,7 @@ overlayCanvas.addEventListener('touchmove', (e) => {
         sio.emit('input_command', `M:${xNorm},${yNorm},${pressure}`);
         
         const rect = overlayCanvas.getBoundingClientRect();
-        const canvasX = (touch.clientX - rect.left) * (overlayCanvas.width / rect.width);
+        const canvasX = (touch.clientX - rect.left) * (inkCanvas.width / rect.width);
         const canvasY = (touch.clientY - rect.top) * (overlayCanvas.height / rect.height);
         addTrailPoint(canvasX, canvasY);
     }
@@ -634,10 +628,18 @@ document.getElementById('bgSelect').onchange = (e) => {
 
 function resizeInkCanvas() {
     const wrapper = document.getElementById('notebookCanvasWrapper');
+    if (!wrapper || wrapper.clientWidth === 0) return;
     inkCanvas.width = wrapper.clientWidth;
     inkCanvas.height = wrapper.clientHeight;
     redrawCanvas();
 }
+const wrapperObserver = new ResizeObserver(() => {
+    if (document.getElementById('notebookScreen').style.display === 'flex') {
+        resizeInkCanvas();
+    }
+});
+wrapperObserver.observe(document.getElementById('notebookCanvasWrapper'));
+
 window.addEventListener('resize', () => {
     if (document.getElementById('notebookScreen').style.display === 'flex') {
         resizeInkCanvas();
@@ -916,12 +918,24 @@ function handlePointerDown(e) {
         
         // Long Press Eraser gesture
         longPressTimeout = setTimeout(() => {
-            if (activePointers.size === 1 && currentInkStroke && currentInkStroke.points.length < 5) {
+            if (activePointers.size === 1 && currentInkStroke) {
+                // Check if moved too much
+                let movedTooMuch = false;
+                const p0 = currentInkStroke.points[0];
+                for(let i=1; i<currentInkStroke.points.length; i++) {
+                    const p = currentInkStroke.points[i];
+                    if (Math.hypot(p[0] - p0[0], p[1] - p0[1]) * camera.z > 15) {
+                        movedTooMuch = true;
+                        break;
+                    }
+                }
+                if (!movedTooMuch) {
                 // Not much movement, switch to temp eraser
                 tempEraserMode = true;
                 document.getElementById('toolEraser').classList.add('eraser-active');
                 currentInkStroke = null;
                 redrawCanvas();
+                }
             }
         }, 500);
         
