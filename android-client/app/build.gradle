@@ -26,10 +26,10 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('release.jks')
-            storePassword 'password'
-            keyAlias 'release'
-            keyPassword 'password'
+            storeFile file('keystore.jks')
+            storePassword 'fingerdraw123'
+            keyAlias 'my-key-alias'
+            keyPassword 'fingerdraw123'
         }
     }
 

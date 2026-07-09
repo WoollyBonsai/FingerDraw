@@ -1,3 +1,14 @@
+const isLocalApp = window.location.protocol === 'file:' || window.location.protocol === 'android-app:';
+
+if (isLocalApp) {
+    // We might need to wait for DOMContentLoaded if script is in <head>, but it's at end of <body>
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('notebookDashboardScreen').style.display = 'flex';
+    if(document.getElementById('btnDashboardBack')) {
+        document.getElementById('btnDashboardBack').style.display = 'none';
+    }
+}
+
 const player = document.getElementById('player');
 const overlayCanvas = document.getElementById('overlayCanvas');
 const overlayCtx = overlayCanvas.getContext('2d');
@@ -69,8 +80,8 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 // Networking
-const sio = io();
-const wsUrl = `ws://${window.location.host}/ws/video`;
+const sio = (isLocalApp || typeof io === 'undefined') ? { emit: () => {}, on: () => {} } : io();
+const wsUrl = isLocalApp ? null : `ws://${window.location.host}/ws/video`;
 let ws = null;
 
 function connectVideo() {
@@ -86,6 +97,7 @@ function connectVideo() {
         debug: false
     });
 
+    if (isLocalApp) return;
     if (ws) ws.close();
     ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
