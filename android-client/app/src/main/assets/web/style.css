@@ -268,9 +268,8 @@ video {
     display: flex;
     flex-direction: column;
     background: #f0f2f5;
-    position: relative;
-    height: 100%;
-    min-width: 0;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
 }
 
 .notebook-toolbar {
@@ -280,6 +279,7 @@ video {
     padding: 12px 16px;
     display: flex;
     flex-wrap: wrap;
+    flex-shrink: 0;
     gap: 10px;
     justify-content: space-between;
     align-items: center;
@@ -351,7 +351,7 @@ video {
 }
 
 .canvas-wrapper-notebook {
-    flex: 1;
+    flex: 1 1 0;
     overflow: hidden;
     position: relative;
     /* Basic paper shadow */
@@ -359,7 +359,6 @@ video {
     margin: 10px; /* Reduced for mobile */
     border-radius: 12px;
     background-color: #ffffff;
-    min-height: 0;
     /* Patterns will be applied via JS dynamically */
 }
 

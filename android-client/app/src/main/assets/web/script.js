@@ -735,14 +735,15 @@ function drawStroke(ctx, strokeObj) {
 }
 
 function drawBackground() {
+    inkCtx.save();
     const dpr = window.devicePixelRatio || 1;
+    inkCtx.scale(dpr, dpr);
+    
     const canvasWidth = inkCanvas.width / dpr;
     const canvasHeight = inkCanvas.height / dpr;
 
     inkCtx.fillStyle = '#ffffff';
     inkCtx.fillRect(0, 0, canvasWidth, canvasHeight);
-    
-    inkCtx.save();
     
     // Draw grid based on camera transformation
     const gridSize = 40 * camera.z;
@@ -780,6 +781,9 @@ function drawBackground() {
 }
 
 function redrawCanvas() {
+    inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+    inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+    
     drawBackground();
     
     inkCtx.save();
