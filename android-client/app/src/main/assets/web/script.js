@@ -629,8 +629,9 @@ document.getElementById('bgSelect').onchange = (e) => {
 function resizeInkCanvas() {
     const wrapper = document.getElementById('notebookCanvasWrapper');
     if (!wrapper || wrapper.clientWidth === 0) return;
-    inkCanvas.width = wrapper.clientWidth;
-    inkCanvas.height = wrapper.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    inkCanvas.width = wrapper.clientWidth * dpr;
+    inkCanvas.height = wrapper.clientHeight * dpr;
     redrawCanvas();
 }
 const wrapperObserver = new ResizeObserver(() => {
@@ -734,8 +735,12 @@ function drawStroke(ctx, strokeObj) {
 }
 
 function drawBackground() {
+    const dpr = window.devicePixelRatio || 1;
+    const canvasWidth = inkCanvas.width / dpr;
+    const canvasHeight = inkCanvas.height / dpr;
+
     inkCtx.fillStyle = '#ffffff';
-    inkCtx.fillRect(0, 0, inkCanvas.width, inkCanvas.height);
+    inkCtx.fillRect(0, 0, canvasWidth, canvasHeight);
     
     inkCtx.save();
     
@@ -747,25 +752,25 @@ function drawBackground() {
     inkCtx.lineWidth = 1;
     if (currentBg === 'ruled') {
         inkCtx.strokeStyle = '#e0e0e0';
-        for (let y = offsetY; y < inkCanvas.height; y += gridSize) {
+        for (let y = offsetY; y < canvasHeight; y += gridSize) {
             if (y < 0) continue;
-            inkCtx.beginPath(); inkCtx.moveTo(0, y); inkCtx.lineTo(inkCanvas.width, y); inkCtx.stroke();
+            inkCtx.beginPath(); inkCtx.moveTo(0, y); inkCtx.lineTo(canvasWidth, y); inkCtx.stroke();
         }
     } else if (currentBg === 'grid') {
         inkCtx.strokeStyle = '#e0e0e0';
-        for (let y = offsetY; y < inkCanvas.height; y += gridSize) {
+        for (let y = offsetY; y < canvasHeight; y += gridSize) {
             if (y < 0) continue;
-            inkCtx.beginPath(); inkCtx.moveTo(0, y); inkCtx.lineTo(inkCanvas.width, y); inkCtx.stroke();
+            inkCtx.beginPath(); inkCtx.moveTo(0, y); inkCtx.lineTo(canvasWidth, y); inkCtx.stroke();
         }
-        for (let x = offsetX; x < inkCanvas.width; x += gridSize) {
+        for (let x = offsetX; x < canvasWidth; x += gridSize) {
             if (x < 0) continue;
-            inkCtx.beginPath(); inkCtx.moveTo(x, 0); inkCtx.lineTo(x, inkCanvas.height); inkCtx.stroke();
+            inkCtx.beginPath(); inkCtx.moveTo(x, 0); inkCtx.lineTo(x, canvasHeight); inkCtx.stroke();
         }
     } else if (currentBg === 'dots') {
         inkCtx.fillStyle = '#c0c0c0';
-        for (let y = offsetY; y < inkCanvas.height; y += gridSize) {
+        for (let y = offsetY; y < canvasHeight; y += gridSize) {
             if (y < 0) continue;
-            for (let x = offsetX; x < inkCanvas.width; x += gridSize) {
+            for (let x = offsetX; x < canvasWidth; x += gridSize) {
                 if (x < 0) continue;
                 inkCtx.beginPath(); inkCtx.arc(x, y, 2, 0, Math.PI*2); inkCtx.fill();
             }
@@ -778,6 +783,8 @@ function redrawCanvas() {
     drawBackground();
     
     inkCtx.save();
+    const dpr = window.devicePixelRatio || 1;
+    inkCtx.scale(dpr, dpr);
     inkCtx.translate(camera.x, camera.y);
     inkCtx.scale(camera.z, camera.z);
     
@@ -912,7 +919,7 @@ function handlePointerDown(e) {
             tool: currentTool,
             penStyle: currentTool === 'pen' ? currentPenStyle : null,
             color: currentColor,
-            size: currentThickness,
+            size: currentThickness / camera.z,
             points: [[wc.x, wc.y, sc.pressure]]
         };
         
