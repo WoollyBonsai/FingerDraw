@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" href="/static/icon.png">
-    <link rel="apple-touch-icon" href="/static/icon.png">
-    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="./icon.png">
+    <link rel="apple-touch-icon" href="./icon.png">
+    <link rel="manifest" href="./manifest.json">
     <title>FingerDraw</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="./style.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jmuxer@2.0.5/dist/jmuxer.min.js"></script>
 </head>
 <body>
     <div id="welcomeScreen">
         <div class="top-nav">
-            <img src="/static/icon.png" alt="FingerDraw Icon" class="logo">
+            <img src="./icon.png" alt="FingerDraw Icon" class="logo">
             <span class="brand">FingerDraw</span>
         </div>
         
@@ -189,19 +189,19 @@
             
             <div class="canvas-wrapper-notebook" id="notebookCanvasWrapper">
                 <canvas id="inkCanvas"></canvas>
-                <canvas id="minimapCanvas" style="position: absolute; top: 16px; right: 16px; width: 150px; height: 100px; background: rgba(255, 255, 255, 0.9); border: 2px solid #ccc; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; z-index: 50;"></canvas>
+                <canvas id="minimapCanvas" width="150" height="100" style="position: absolute; top: 16px; right: 16px; width: 150px; height: 100px; background: rgba(255, 255, 255, 0.9); border: 2px solid #ccc; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: none; z-index: 50;"></canvas>
                 <div id="palmBubble" style="display: none; position: absolute; width: 60px; height: 60px; background: rgba(231, 76, 60, 0.4); border: 2px solid #e74c3c; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); transition: opacity 0.3s; z-index: 100;"></div>
             </div>
         </div>
     </div>
-    <script src="/static/perfect-freehand.js"></script>
-    <script src="/static/idb.js"></script>
-    <script src="/static/script.js"></script>
-    <script src="/static/training.js"></script>
+    <script src="./perfect-freehand.js"></script>
+    <script src="./idb.js"></script>
+    <script src="./script.js"></script>
+    <script src="./training.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js').then(reg => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
                     console.log('ServiceWorker registration successful');
                 }).catch(err => {
                     console.log('ServiceWorker registration failed: ', err);
